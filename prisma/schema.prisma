@@ -1,0 +1,344 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  FOUNDER
+  INVESTOR
+  ADMIN
+}
+
+enum CompanyPhase {
+  IDEA_VALIDATION      // Phase 1: Reality Check
+  BUILD_AND_LAUNCH     // Phase 2: Build & Launch Sprint
+  TRACTION_ENGINE      // Phase 3: Traction Engine
+  COFOUNDER_HARMONY    // Phase 4: Co-founder Therapist
+  INVESTOR_READY       // Phase 5: Investor Simulator
+}
+
+enum IdeaStatus {
+  SUBMITTED
+  BEING_SHREDDED
+  FAILED_VALIDATION
+  PASSED_VALIDATION
+  IN_REVISION
+}
+
+enum InterviewStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  ANALYZED
+}
+
+enum FeatureStatus {
+  BACKLOG
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  DEPLOYED
+}
+
+enum ConflictSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  role          UserRole  @default(FOUNDER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  companies     CompanyMember[]
+  activities    ActivityLog[]
+  vibeCheckins  VibeCheckin[]
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Company {
+  id              String        @id @default(cuid())
+  name            String
+  description     String?
+  currentPhase    CompanyPhase  @default(IDEA_VALIDATION)
+  isPhaseUnlocked Boolean       @default(false) // Gatekeeper logic
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Investor Ready Score (IRS)
+  irsScore        Int           @default(0) // 0-1000
+  velocityScore   Int           @default(0)
+  harmonyScore    Int           @default(0)
+  marketScore     Int           @default(0)
+  tractionScore   Int           @default(0)
+
+  // Relations
+  members         CompanyMember[]
+  idea            Idea?
+  interviews      Interview[]
+  features        Feature[]
+  metrics         Metric[]
+  activities      ActivityLog[]
+  vibeCheckins    VibeCheckin[]
+  conflicts       Conflict[]
+  pitches         InvestorPitch[]
+
+  @@map("companies")
+}
+
+model CompanyMember {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  userId      String   @map("user_id")
+  equity      Float    @default(0)
+  role        String   // e.g., "CEO", "CTO", "Designer"
+  isActive    Boolean  @default(true)
+  joinedAt    DateTime @default(now())
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@map("company_members")
+}
+
+model Idea {
+  id              String      @id @default(cuid())
+  companyId       String      @unique @map("company_id")
+  title           String
+  description     String
+  targetMarket    String
+  problem         String
+  solution        String
+  status          IdeaStatus  @default(SUBMITTED)
+
+  // AI Shredder Results
+  shredderReport  String?     // JSON: Why You Will Fail Report
+  competitorsMissed String?   // JSON: List of competitors
+  economicFlaws   String?     // JSON: Economic issues
+  founderRebuttal String?     // Founder's counter-arguments
+  aiConvincedScore Int?       // 0-100: How convinced the AI is
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("ideas")
+}
+
+model Interview {
+  id              String          @id @default(cuid())
+  companyId       String          @map("company_id")
+  status          InterviewStatus @default(PENDING)
+
+  // Interview Details
+  intervieweeEmail String?
+  intervieweeName  String?
+  script          String?         // JSON: Mom Test questions
+  transcript      String?         // Full interview transcript
+  notes           String?         // Founder's notes
+  insights        String?         // JSON: AI-extracted insights
+
+  // Results
+  hasProblem      Boolean?        // Does interviewee have the problem?
+  wouldPay        Boolean?        // Would they pay for solution?
+  painLevel       Int?            // 1-10 scale
+
+  scheduledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("interviews")
+}
+
+model Feature {
+  id              String        @id @default(cuid())
+  companyId       String        @map("company_id")
+  title           String
+  description     String
+  status          FeatureStatus @default(BACKLOG)
+
+  // Vibe Coding Box constraints
+  isEssential     Boolean       @default(true)
+  blockedReason   String?       // Why AI blocked this feature
+  aiApproved      Boolean       @default(false)
+
+  // Metrics
+  commitsCount    Int           @default(0)
+  linesAdded      Int           @default(0)
+  linesRemoved    Int           @default(0)
+
+  createdAt       DateTime      @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  deployedAt      DateTime?
+  updatedAt       DateTime      @updatedAt
+
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("features")
+}
+
+model Metric {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  date            DateTime @default(now())
+
+  // AARRR Metrics
+  acquisition     Int      @default(0) // New sign-ups
+  activation      Int      @default(0) // Completed onboarding
+  retention       Float    @default(0) // % retained after 7 days
+  revenue         Float    @default(0) // Revenue in USD
+  referral        Int      @default(0) // Referrals made
+
+  // Advanced Metrics
+  churnCount      Int      @default(0)
+  viralCoefficient Float   @default(0)
+  ltv             Float    @default(0)
+  cac             Float    @default(0)
+
+  createdAt       DateTime @default(now())
+
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("metrics")
+}
+
+model ActivityLog {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  userId          String?  @map("user_id")
+  type            String   // e.g., "CODE_COMMIT", "USER_INTERVIEW", "FEATURE_DEPLOYED"
+  title           String
+  description     String?
+  metadata        String?  // JSON: Additional data
+
+  // For IRS calculation
+  impactScore     Int      @default(0) // How much this affects IRS
+
+  createdAt       DateTime @default(now())
+
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("activity_logs")
+}
+
+model VibeCheckin {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  userId          String   @map("user_id")
+  weekOf          DateTime
+
+  // Questions
+  workloadSelfAssessment  Int   // 0-100: How much work did you do?
+  resentmentLevel         Int   @default(0) // 0-10: Any resentment?
+  cofounderWorkAssessment String? // JSON: Rating of each co-founder
+  notes                   String?
+
+  createdAt       DateTime @default(now())
+
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("vibe_checkins")
+}
+
+model Conflict {
+  id              String           @id @default(cuid())
+  companyId       String           @map("company_id")
+  severity        ConflictSeverity @default(MEDIUM)
+
+  // AI-detected issue
+  issue           String
+  detectedFrom    String?          // e.g., "vibe_checkin", "activity_imbalance"
+  aiRecommendation String?
+
+  // Resolution
+  isResolved      Boolean          @default(false)
+  resolutionNotes String?
+  resolvedAt      DateTime?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("conflicts")
+}
+
+model InvestorPitch {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+
+  // Pitch content
+  pitchDeck       String?  // URL to deck
+  askAmount       Float
+  valuation       Float?
+
+  // AI Due Diligence Results
+  aiVerdict       String?  // APPROVED, REJECTED, NEEDS_WORK
+  aiReasons       String?  // JSON: Specific issues
+  unitEconomics   String?  // JSON: LTV/CAC analysis
+
+  // Metrics at time of pitch
+  irsScoreAtPitch Int
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("investor_pitches")
+}
