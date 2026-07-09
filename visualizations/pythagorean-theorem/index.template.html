@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Explorer — Pythagorean Theorem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f0ebe1;
+    --card:#fbf9f4;
+    --card-border:#e7e0d4;
+    --ink:#2e2a33;
+    --ink-soft:#6f6878;
+    --plum:#6b5468;
+    --mauve:#9c81a4;
+    --mauve-deep:#8a6f94;
+    --rose:#a5798d;
+    --peri:#7b8fd4;
+    --blue:#6b84d8;
+    --track:#ded7e8;
+    --shadow:0 10px 30px rgba(90,75,100,.10), 0 2px 6px rgba(90,75,100,.06);
+    --radius:20px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:'Archivo','Segoe UI',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    overflow:hidden;
+  }
+  #stage{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 60% 55% at 50% 48%,#f6f0e6 0%,var(--bg) 75%)}
+  #stage canvas{display:block}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+
+  /* ---------- left column ---------- */
+  .col-left{
+    position:fixed;left:22px;top:22px;bottom:22px;width:268px;
+    display:flex;flex-direction:column;gap:16px;z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:12px;padding:16px 18px}
+  .brand-logo{
+    width:44px;height:44px;border-radius:12px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .brand h1{font-size:16px;font-weight:800;letter-spacing:.04em;line-height:1.1}
+  .brand p{font-size:10px;font-weight:600;letter-spacing:.14em;color:var(--ink-soft);margin-top:3px}
+
+  .concepts{flex:1;padding:20px 16px;display:flex;flex-direction:column;overflow:auto}
+  .concepts h2{
+    font-size:12px;font-weight:800;letter-spacing:.08em;
+    padding:0 6px 12px;border-bottom:1px solid var(--card-border);margin-bottom:16px;
+  }
+  .concept{
+    display:flex;align-items:center;gap:12px;
+    padding:11px 14px;margin-bottom:12px;
+    border:1px solid #d9d2c7;border-radius:999px;
+    background:transparent;cursor:pointer;width:100%;
+    font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);
+    transition:background .2s,border-color .2s,transform .12s;
+    text-align:left;white-space:nowrap;
+  }
+  .concept:hover{background:#f2ede4;transform:translateX(2px)}
+  .concept .cicon{
+    width:30px;height:30px;border-radius:9px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink);
+  }
+  .concept.active{
+    background:linear-gradient(135deg,#a289aa,#8d7295);
+    border-color:transparent;color:#fff;
+    box-shadow:0 8px 18px rgba(140,115,150,.35);
+  }
+  .concept.active .cicon{background:rgba(255,255,255,.18);color:#fff}
+
+  /* ---------- right column ---------- */
+  .col-right{
+    position:fixed;right:22px;top:22px;bottom:22px;width:292px;
+    display:flex;flex-direction:column;gap:16px;z-index:10;
+  }
+  .user{display:flex;align-items:center;gap:12px;padding:13px 16px}
+  .avatar{
+    width:42px;height:42px;border-radius:12px;background:#ece4ee;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;color:var(--mauve-deep);
+  }
+  .user-meta{flex:1;min-width:0}
+  .user-meta .name{font-size:13px;font-weight:800;letter-spacing:.05em}
+  .user-meta .level{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--ink-soft);margin:2px 0 6px}
+  .xpbar{height:5px;border-radius:99px;background:var(--track);overflow:hidden}
+  .xpbar i{display:block;height:100%;width:22%;border-radius:99px;background:var(--rose);transition:width .6s ease}
+  .burger{display:flex;flex-direction:column;gap:4px;padding:6px;cursor:pointer;border:0;background:none}
+  .burger span{width:18px;height:2px;background:var(--ink);border-radius:2px}
+
+  .details{padding:20px}
+  .details h2,.objectives h2{
+    font-size:12.5px;font-weight:800;letter-spacing:.08em;
+    padding-bottom:12px;border-bottom:1px solid var(--card-border);margin-bottom:16px;
+  }
+  .label{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ink-soft)}
+  .formula{font-size:24px;font-weight:700;margin:6px 0 18px;letter-spacing:.02em}
+  .formula sup{font-size:.55em}
+  .siderow{margin-bottom:15px}
+  .siderow .rowtop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  .siderow .rowtop .units{font-size:12.5px;font-weight:600}
+  .siderow .label b{color:var(--ink);font-weight:800}
+  .bar{height:7px;border-radius:99px;background:var(--track);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:99px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+  .bar.a i{width:35%;background:var(--rose)}
+  .bar.b i{width:58%;background:var(--peri)}
+  .bar.c i{width:76%;background:var(--blue)}
+  .siderow.pulse .bar i{animation:pulse 1s ease infinite}
+  @keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+  .totals{margin-top:18px}
+  .totals .sum{font-size:23px;font-weight:700;margin-top:5px}
+
+  .objectives{padding:20px}
+  .objectives li{
+    list-style:none;font-size:12.5px;font-weight:700;letter-spacing:.06em;
+    color:#4a4452;padding:7px 0;display:flex;align-items:center;gap:10px;
+  }
+  .objectives li .dot{width:7px;height:7px;border-radius:99px;flex:0 0 auto;transition:background .3s}
+  .objectives li .dot{background:var(--track)}
+  .objectives li.done .dot{background:#7fb069}
+
+  /* ---------- center ---------- */
+  .titleblock{
+    position:fixed;top:30px;left:50%;transform:translateX(-50%);
+    text-align:center;z-index:5;pointer-events:none;width:min(560px,44vw);
+  }
+  .titleblock h1{
+    font-size:clamp(34px,4.6vw,58px);
+    font-weight:900;font-stretch:80%;
+    letter-spacing:.015em;line-height:.95;color:var(--plum);
+    text-transform:uppercase;
+  }
+  .titleblock p{
+    margin-top:12px;font-size:15px;font-weight:600;letter-spacing:.26em;
+    color:#3d3844;text-transform:uppercase;
+  }
+
+  .chip{
+    position:fixed;left:50%;bottom:118px;transform:translateX(-50%);
+    z-index:8;text-align:center;
+    background:var(--card);border:1px solid var(--card-border);
+    border-radius:14px;box-shadow:var(--shadow);
+    padding:10px 22px;min-width:170px;
+  }
+  .chip::before{
+    content:"";position:absolute;top:-7px;left:50%;transform:translateX(-50%) rotate(45deg);
+    width:13px;height:13px;background:var(--card);
+    border-left:1px solid var(--card-border);border-top:1px solid var(--card-border);
+  }
+  .chip .t1{font-size:15px;font-weight:800}
+  .chip .t2{font-size:12px;font-weight:600;color:var(--ink-soft);margin-top:2px}
+  .chip .answers{display:none;gap:8px;justify-content:center;margin-top:9px}
+  .chip.quiz .answers{display:flex}
+  .chip .answers button{
+    font-family:inherit;font-size:14px;font-weight:800;
+    width:42px;height:34px;border-radius:10px;cursor:pointer;
+    border:1px solid #d9d2c7;background:#fff;color:var(--ink);
+    transition:background .15s,color .15s,transform .1s;
+  }
+  .chip .answers button:hover{background:#efe9df;transform:translateY(-1px)}
+  .chip .answers button.good{background:#7fb069;border-color:#7fb069;color:#fff}
+  .chip .answers button.bad{background:#c96a6a;border-color:#c96a6a;color:#fff}
+  .chip.shake{animation:shake .4s ease}
+  @keyframes shake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 7px))}75%{transform:translateX(calc(-50% + 7px))}}
+
+  .modes{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    z-index:10;display:flex;align-items:center;gap:6px;
+    padding:7px;border-radius:999px;
+  }
+  .mode{
+    display:flex;align-items:center;gap:9px;
+    font-family:inherit;font-size:13px;font-weight:800;letter-spacing:.08em;
+    color:var(--ink);background:none;border:0;border-radius:999px;
+    padding:13px 26px;cursor:pointer;transition:background .2s,color .2s;
+  }
+  .mode svg{width:17px;height:17px}
+  .mode:hover{background:#f0e9dd}
+  .mode.active{
+    background:linear-gradient(135deg,#a289aa,#8d7295);color:#fff;
+    box-shadow:0 8px 18px rgba(140,115,150,.35);
+  }
+
+  .toast{
+    position:fixed;left:50%;top:20px;transform:translate(-50%,-80px);
+    z-index:30;background:#3a3440;color:#fff;
+    font-size:13px;font-weight:600;letter-spacing:.03em;
+    padding:11px 22px;border-radius:999px;box-shadow:var(--shadow);
+    transition:transform .35s cubic-bezier(.34,1.4,.64,1);pointer-events:none;
+  }
+  .toast.show{transform:translate(-50%,0)}
+
+  #loader{
+    position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;background:var(--bg);
+    transition:opacity .5s;font-size:12px;font-weight:700;letter-spacing:.2em;color:var(--ink-soft);
+  }
+  #loader.hide{opacity:0;pointer-events:none}
+  #loader .spin{
+    width:38px;height:38px;border-radius:99px;
+    border:3px solid var(--track);border-top-color:var(--mauve-deep);
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media (max-width:1180px){
+    .col-left{width:230px}
+    .col-right{width:260px}
+    .titleblock{width:38vw}
+  }
+</style>
+</head>
+<body>
+
+<div id="loader"><div class="spin"></div>LOADING MODEL</div>
+<div id="stage"></div>
+
+<!-- ================= LEFT ================= -->
+<aside class="col-left">
+  <div class="card brand">
+    <div class="brand-logo">
+      <svg viewBox="0 0 44 44" width="44" height="44">
+        <path d="M8 33 L23 12 L30 22 L36 15 L36 33 Z" fill="#b9a6c9"/>
+        <path d="M8 33 L23 12 L30 22 L24 33 Z" fill="#6b5468"/>
+      </svg>
+    </div>
+    <div><h1>MATH EXPLORER</h1><p>LEARN THE BASICS</p></div>
+  </div>
+
+  <nav class="card concepts">
+    <h2>GEOMETRY CONCEPTS</h2>
+    <button class="concept active" data-topic="Pythagorean Theorem">
+      <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></span>
+      Pythagorean Theorem
+    </button>
+    <button class="concept" data-topic="Right Angles">
+      <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v14h14"/><path d="M6 12h6v6"/></svg></span>
+      Right Angles
+    </button>
+    <button class="concept" data-topic="Square Numbers">
+      <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 4v16M4 12h16"/></svg></span>
+      Square Numbers
+    </button>
+    <button class="concept" data-topic="Area Calculation">
+      <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 15l6-6M15 15V9H9"/></svg></span>
+      Area Calculation
+    </button>
+    <button class="concept" data-topic="Triangle Types">
+      <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14L5 5v14z"/></svg></span>
+      Triangle Types
+    </button>
+    <button class="concept" data-topic="Proof Visuals">
+      <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="7" r="2"/><circle cx="12" cy="17" r="2"/><path d="M8 8l3 7M16 8l-3 7"/></svg></span>
+      Proof Visuals
+    </button>
+  </nav>
+</aside>
+
+<!-- ================= CENTER ================= -->
+<header class="titleblock">
+  <h1>Pythagorean<br>Theorem</h1>
+  <p>Fundamental Geometry</p>
+</header>
+
+<div class="chip" id="chip">
+  <div class="t1" id="chipT1">3:4:5 Triangle</div>
+  <div class="t2" id="chipT2">a&sup2; + b&sup2; = c&sup2;</div>
+  <div class="answers" id="chipAnswers"></div>
+</div>
+
+<div class="modes card">
+  <button class="mode" data-mode="practice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+    PRACTICE
+  </button>
+  <button class="mode active" data-mode="explore">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    EXPLORE
+  </button>
+  <button class="mode" data-mode="test">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="M9 13l2 2 4-4"/></svg>
+    TEST
+  </button>
+</div>
+
+<!-- ================= RIGHT ================= -->
+<aside class="col-right">
+  <div class="card user">
+    <div class="avatar">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.4 3.9-5 7-5s5.8 1.6 7 5"/></svg>
+    </div>
+    <div class="user-meta">
+      <div class="name">STUDENT-1</div>
+      <div class="level" id="levelLabel">LEVEL 10</div>
+      <div class="xpbar"><i id="xpFill"></i></div>
+    </div>
+    <button class="burger" aria-label="menu"><span></span><span></span><span></span></button>
+  </div>
+
+  <div class="card details">
+    <h2>THEOREM DETAILS</h2>
+    <div class="label">FORMULA</div>
+    <div class="formula">a&sup2; + b&sup2; = c&sup2;</div>
+
+    <div class="siderow" id="rowA">
+      <div class="rowtop"><span class="label">SIDE <b>a</b></span><span class="units">3 units</span></div>
+      <div class="bar a"><i></i></div>
+    </div>
+    <div class="siderow" id="rowB">
+      <div class="rowtop"><span class="label">SIDE <b>b</b></span><span class="units">4 units</span></div>
+      <div class="bar b"><i></i></div>
+    </div>
+    <div class="siderow" id="rowC">
+      <div class="rowtop"><span class="label">HYPOTENUSE <b>c</b></span><span class="units">5 units</span></div>
+      <div class="bar c"><i></i></div>
+    </div>
+
+    <div class="totals">
+      <div class="label">TOTAL SQUARES</div>
+      <div class="sum">9 + 16 = 25</div>
+    </div>
+  </div>
+
+  <div class="card objectives">
+    <h2>LEARNING OBJECTIVES</h2>
+    <ul>
+      <li id="obj1"><span class="dot"></span>IDENTIFY RIGHT ANGLES</li>
+      <li id="obj2"><span class="dot"></span>CALCULATE HYPOTENUSE</li>
+      <li id="obj3"><span class="dot"></span>UNDERSTAND SQUARES</li>
+    </ul>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script type="text/plain" id="objdata">__OBJ_DATA__</script>
+
+<script>__BUNDLE_JS__</script>
+</body>
+</html>
