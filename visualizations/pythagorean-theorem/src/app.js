@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
 /* ---------------- scene ---------------- */
 const stage = document.getElementById('stage');
@@ -35,7 +34,7 @@ scene.add(rim);
 
 const glowGroup = new THREE.Group();
 [[0, -0.42, 0.5], [-0.46, 0.52, 0.5], [0.5, 0.55, 0.5]].forEach(([x, y, z]) => {
-  const p = new THREE.PointLight(0xffcf9a, 1.7, 1.15, 2);
+  const p = new THREE.PointLight(0xffcf9a, 1.2, 1.3, 2);
   p.position.set(x, y, z);
   glowGroup.add(p);
 });
@@ -89,18 +88,22 @@ function splitComponents(geom) {
   return [...groups.values()];
 }
 
-function geomFromTris(srcPos, tris) {
-  const arr = new Float32Array(tris.length * 9);
-  let o = 0;
-  for (const t of tris) {
-    for (let k = 0; k < 3; k++) {
-      const i = t * 3 + k;
-      arr[o++] = srcPos.getX(i); arr[o++] = srcPos.getY(i); arr[o++] = srcPos.getZ(i);
-    }
-  }
+function geomFromTris(srcGeom, tris) {
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-  g.computeVertexNormals();
+  for (const [name, itemSize] of [['position', 3], ['normal', 3], ['uv', 2]]) {
+    const src = srcGeom.attributes[name];
+    if (!src) continue;
+    const arr = new Float32Array(tris.length * 3 * itemSize);
+    let o = 0;
+    for (const t of tris) {
+      for (let k = 0; k < 3; k++) {
+        const i = t * 3 + k;
+        for (let c = 0; c < itemSize; c++) arr[o++] = src.array[i * itemSize + c];
+      }
+    }
+    g.setAttribute(name, new THREE.BufferAttribute(arr, itemSize));
+  }
+  if (!g.attributes.normal) g.computeVertexNormals();
   return g;
 }
 
@@ -196,60 +199,83 @@ const parts = {};           // a | b | c -> part record
 let frameGroup = null;
 const raycastTargets = [];
 
-const PART_STYLE = {
-  a: { color: 0xb98ca6, n: 3 },
-  b: { color: 0x8b9be0, n: 4 },
-  c: { color: 0x7e8bd8, n: 5 },
-};
+const PART_N = { a: 3, b: 4, c: 5 };
 
 {
-  const text = document.getElementById('objdata').textContent;
-  const obj = new OBJLoader().parse(text);
-  let srcGeom = null;
-  obj.traverse((n) => { if (n.isMesh && !srcGeom) srcGeom = n.geometry; });
+  const data = JSON.parse(document.getElementById('modeldata').textContent);
+  const f32 = (s) => {
+    const bin = atob(s);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Float32Array(bytes.buffer);
+  };
+
+  /* textures (baked colors + engraved detail) */
+  const mkTex = (dataURL, srgb) => {
+    if (!dataURL) return null;
+    const img = new Image();
+    const tex = new THREE.Texture(img);
+    if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    img.onload = () => { tex.needsUpdate = true; document.getElementById('loader').classList.add('hide'); };
+    img.src = dataURL;
+    return tex;
+  };
+  const diffTex = mkTex(data.diffuse, true);
+  const normTex = mkTex(data.normal, false);
+
+  /* geometry: decode, then normalize to the same local span the layout constants assume */
+  const mesh0 = data.meshes[0];
+  const srcGeom = new THREE.BufferGeometry();
+  srcGeom.setAttribute('position', new THREE.BufferAttribute(f32(mesh0.position), 3));
+  if (mesh0.normal) srcGeom.setAttribute('normal', new THREE.BufferAttribute(f32(mesh0.normal), 3));
+  if (mesh0.uv) srcGeom.setAttribute('uv', new THREE.BufferAttribute(f32(mesh0.uv), 2));
   srcGeom.center();
+  {
+    srcGeom.computeBoundingBox();
+    const size = srcGeom.boundingBox.getSize(new THREE.Vector3());
+    const k = 1.9 / Math.max(size.x, size.y, size.z);
+    const pos = srcGeom.attributes.position.array;
+    for (let i = 0; i < pos.length; i++) pos[i] *= k;
+  }
   const srcPos = srcGeom.attributes.position;
 
-  /* segment into connected components, pick the three squares by front-face area */
+  const sqMat = () => new THREE.MeshStandardMaterial({
+    map: diffTex,
+    normalMap: normTex,
+    roughness: 0.5,
+    metalness: 0.05,
+    emissive: 0xffffff,
+    emissiveMap: diffTex,
+    emissiveIntensity: 0.12,
+  });
+
+  /* segment into connected components; the three biggest front faces are the squares */
   const comps = splitComponents(srcGeom).map((tris) => ({ tris, ...compStats(srcPos, tris) }));
   comps.sort((p, q) => q.frontArea - p.frontArea);
-  let squares = comps.slice(0, 3);
-  let rest = comps.slice(3);
-  if (comps.length < 3) { squares = comps; rest = []; }
+  const squares = comps.slice(0, Math.min(3, comps.length));
+  const rest = comps.slice(squares.length);
 
-  /* smallest front area = a (3), then b (4), largest = c (5) */
-  squares.sort((p, q) => p.frontArea - q.frontArea);
-  const keys = ['a', 'b', 'c'].slice(0, squares.length);
-
-  keys.forEach((keyName, idx) => {
-    const compData = squares[idx];
-    const style = PART_STYLE[keyName];
-    const g = geomFromTris(srcPos, compData.tris);
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: style.color,
-      transparent: true,
-      opacity: 0.9,
-      roughness: 0.32,
-      metalness: 0.05,
-      clearcoat: 0.6,
-      clearcoatRoughness: 0.35,
-      emissive: new THREE.Color(style.color).multiplyScalar(0.5),
-      emissiveIntensity: 0.3,
-    });
+  /* the model engraves its own letters: a = top-left, b = top-right, c = bottom */
+  const used = new Set();
+  const keyFor = (comp) => {
+    const k = comp.centroid.y < -0.05 ? 'c' : comp.centroid.x < 0 ? 'a' : 'b';
+    return used.has(k) ? null : k;
+  };
+  const ranked = [...squares].sort((p, q) => p.frontArea - q.frontArea); // a smallest .. c biggest fallback
+  squares.forEach((compData) => {
+    let keyName = keyFor(compData);
+    if (!keyName) keyName = ['a', 'b', 'c'].find((k) => !used.has(k));
+    used.add(keyName);
+    const g = geomFromTris(srcGeom, compData.tris);
+    const mat = sqMat();
     const mesh = new THREE.Mesh(g, mat);
     mesh.userData.part = keyName;
-    mesh.add(new THREE.LineSegments(
-      new THREE.EdgesGeometry(g, 28),
-      new THREE.LineBasicMaterial({ color: 0xfff4dd, transparent: true, opacity: 0.4 })
-    ));
     const group = new THREE.Group();
     group.add(mesh);
 
     /* fitted front rectangle -> counting tile grid */
     const frontPts = [];
-    for (let i = 0; i < srcPos.count; i += 2) {
-      /* skip: filled below from component verts only */
-    }
     for (const t of compData.tris) {
       for (let k = 0; k < 3; k++) {
         const i = t * 3 + k;
@@ -260,7 +286,7 @@ const PART_STYLE = {
     if (frontPts.length > 8) rect = minAreaRect(frontPts);
     let tiles = null;
     if (rect) {
-      const n = style.n;
+      const n = PART_N[keyName];
       const cw = rect.width / n, ch = rect.height / n;
       const tileGeom = new THREE.BoxGeometry(cw * 0.84, ch * 0.84, 0.02);
       const tileMat = new THREE.MeshBasicMaterial({ color: 0xffedc4, transparent: true, opacity: 0.95 });
@@ -295,34 +321,24 @@ const PART_STYLE = {
     model.add(group);
     raycastTargets.push(mesh);
     parts[keyName] = {
-      key: keyName, group, mesh, mat, label, tiles, n: style.n,
+      key: keyName, group, mesh, mat, label, tiles, n: PART_N[keyName],
       dir: new THREE.Vector3(compData.centroid.x, compData.centroid.y, 0).normalize(),
-      baseEmissive: 0.3,
+      baseEmissive: 0.12,
     };
   });
 
-  /* everything else (triangle frame, small details) glows warm */
+  /* everything else: the cream triangle frame with the engraved side letters */
   if (rest.length) {
     const allTris = rest.flatMap((r) => r.tris);
-    const g = geomFromTris(srcPos, allTris);
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: 0xfff0d8, transparent: true, opacity: 0.95,
-      roughness: 0.3, metalness: 0.02,
-      emissive: 0xffc98a, emissiveIntensity: 0.65,
-    });
+    const g = geomFromTris(srcGeom, allTris);
+    const mat = sqMat();
     const mesh = new THREE.Mesh(g, mat);
     frameGroup = new THREE.Group();
     frameGroup.add(mesh);
     model.add(frameGroup);
   }
 
-  const box = new THREE.Box3().setFromObject(model);
-  const size = box.getSize(new THREE.Vector3());
-  const s = 2.05 / Math.max(size.x, size.y, size.z);
-  model.scale.setScalar(s);
   model.position.y = 0.02;
-
-  document.getElementById('loader').classList.add('hide');
 }
 
 /* ---------------- shared helpers ---------------- */
@@ -470,7 +486,7 @@ let highlightKey = null;
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const t = clock.getElapsedTime();
-  glowGroup.children.forEach((p, i) => (p.intensity = 1.6 + Math.sin(t * 2.1 + i * 1.7) * 0.5));
+  glowGroup.children.forEach((p, i) => (p.intensity = 1.1 + Math.sin(t * 2.1 + i * 1.7) * 0.4));
   model.position.y = 0.02 + Math.sin(t * 0.8) * 0.022;
 
   explodeF += ((exploded ? 1 : 0) - explodeF) * 0.07;
@@ -478,9 +494,9 @@ renderer.setAnimationLoop(() => {
     const p = parts[k];
     p.group.position.copy(p.dir).multiplyScalar(0.34 * explodeF);
     let target = p.baseEmissive;
-    if (hoverPart === p) target += 0.25;
-    if (highlightKey === k) target += 0.3 + Math.sin(t * 5) * 0.15;
-    if (countState && countState.part === p) target += 0.35;
+    if (hoverPart === p) target += 0.3;
+    if (highlightKey === k) target += 0.35 + Math.sin(t * 5) * 0.18;
+    if (countState && countState.part === p) target += 0.4;
     p.mat.emissiveIntensity += (target - p.mat.emissiveIntensity) * 0.15;
   }
 
