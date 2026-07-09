@@ -15,8 +15,23 @@ the Three.js engine are embedded inline), so it works offline with no server.
 - **Explore mode** — free-orbit the model.
 - **Practice mode** — steps through sides a, b, and c, pulsing the matching
   bar in the Theorem Details panel and explaining each square count.
-- **Test mode** — quick-fire hypotenuse quizzes (3-4-5, 6-8-10, 5-12-13, 9-12-15);
-  correct answers earn XP toward the next level, learning objectives tick green.
+- **Test mode** — mixed question types (find the hypotenuse, find a missing
+  leg, verify a right triangle, ladder word problems) with hints, streak
+  tracking, and a worked explanation after every correct answer.
+- **Adjustable triangle** — −/+ steppers on sides a and b (1–12) recompute
+  c, the bars, and the square totals live, including non-integer hypotenuses
+  (c = √13 ≈ 3.61) and perfect-triple callouts.
+- **Six interactive lessons** — every sidebar topic opens a lesson card:
+  - *Pythagorean Theorem*: squares-on-sides diagram + tap-to-load triples
+  - *Right Angles*: drag an angle until it snaps to 90°
+  - *Square Numbers*: grow an n×n cell grid
+  - *Area Calculation*: resizable width × height rectangle
+  - *Triangle Types*: classify acute/right/obtuse by comparing a²+b² to c²
+  - *Proof Visuals*: step-through proof — 9 + 16 cells exactly fill the 25
+  Each lesson ends with a check question; passing it marks the topic ✓.
+- **Persistent progress** — XP, level, completed topics, quiz stats, and
+  best streak are saved in localStorage; learning objectives tick green as
+  the student masters them.
 
 ## Files
 

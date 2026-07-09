@@ -20,6 +20,7 @@
     --rose:#a5798d;
     --peri:#7b8fd4;
     --blue:#6b84d8;
+    --green:#7fb069;
     --track:#ded7e8;
     --shadow:0 10px 30px rgba(90,75,100,.10), 0 2px 6px rgba(90,75,100,.06);
     --radius:20px;
@@ -81,13 +82,21 @@
     box-shadow:0 8px 18px rgba(140,115,150,.35);
   }
   .concept.active .cicon{background:rgba(255,255,255,.18);color:#fff}
+  .concept .tick{
+    margin-left:auto;width:17px;height:17px;border-radius:99px;flex:0 0 auto;
+    background:var(--green);color:#fff;font-size:10px;font-weight:800;
+    display:none;align-items:center;justify-content:center;
+  }
+  .concept.done .tick{display:flex}
 
   /* ---------- right column ---------- */
   .col-right{
     position:fixed;right:22px;top:22px;bottom:22px;width:292px;
-    display:flex;flex-direction:column;gap:16px;z-index:10;
+    display:flex;flex-direction:column;gap:16px;z-index:10;overflow:auto;
+    scrollbar-width:none;
   }
-  .user{display:flex;align-items:center;gap:12px;padding:13px 16px}
+  .col-right::-webkit-scrollbar{display:none}
+  .user{display:flex;align-items:center;gap:12px;padding:13px 16px;flex:0 0 auto}
   .avatar{
     width:42px;height:42px;border-radius:12px;background:#ece4ee;flex:0 0 auto;
     display:flex;align-items:center;justify-content:center;color:var(--mauve-deep);
@@ -100,7 +109,7 @@
   .burger{display:flex;flex-direction:column;gap:4px;padding:6px;cursor:pointer;border:0;background:none}
   .burger span{width:18px;height:2px;background:var(--ink);border-radius:2px}
 
-  .details{padding:20px}
+  .details{padding:20px;flex:0 0 auto}
   .details h2,.objectives h2{
     font-size:12.5px;font-weight:800;letter-spacing:.08em;
     padding-bottom:12px;border-bottom:1px solid var(--card-border);margin-bottom:16px;
@@ -109,27 +118,37 @@
   .formula{font-size:24px;font-weight:700;margin:6px 0 18px;letter-spacing:.02em}
   .formula sup{font-size:.55em}
   .siderow{margin-bottom:15px}
-  .siderow .rowtop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
-  .siderow .rowtop .units{font-size:12.5px;font-weight:600}
+  .siderow .rowtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+  .siderow .rowtop .units{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
   .siderow .label b{color:var(--ink);font-weight:800}
+  .stepper{display:flex;align-items:center;gap:8px}
+  .stepbtn{
+    width:21px;height:21px;border-radius:7px;cursor:pointer;
+    border:1px solid #d9d2c7;background:#fff;color:var(--ink);
+    font-family:inherit;font-size:13px;font-weight:800;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .15s;
+  }
+  .stepbtn:hover{background:#efe9df}
   .bar{height:7px;border-radius:99px;background:var(--track);overflow:hidden}
   .bar i{display:block;height:100%;border-radius:99px;transition:width .7s cubic-bezier(.4,0,.2,1)}
-  .bar.a i{width:35%;background:var(--rose)}
-  .bar.b i{width:58%;background:var(--peri)}
+  .bar.a i{width:46%;background:var(--rose)}
+  .bar.b i{width:61%;background:var(--peri)}
   .bar.c i{width:76%;background:var(--blue)}
   .siderow.pulse .bar i{animation:pulse 1s ease infinite}
   @keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+  @media (prefers-reduced-motion:reduce){.siderow.pulse .bar i{animation:none}}
   .totals{margin-top:18px}
-  .totals .sum{font-size:23px;font-weight:700;margin-top:5px}
+  .totals .sum{font-size:22px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums}
+  .totals .subnote{font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-top:3px;min-height:14px}
 
-  .objectives{padding:20px}
+  .objectives{padding:20px;flex:0 0 auto}
   .objectives li{
     list-style:none;font-size:12.5px;font-weight:700;letter-spacing:.06em;
     color:#4a4452;padding:7px 0;display:flex;align-items:center;gap:10px;
   }
-  .objectives li .dot{width:7px;height:7px;border-radius:99px;flex:0 0 auto;transition:background .3s}
-  .objectives li .dot{background:var(--track)}
-  .objectives li.done .dot{background:#7fb069}
+  .objectives li .dot{width:7px;height:7px;border-radius:99px;flex:0 0 auto;background:var(--track);transition:background .3s}
+  .objectives li.done .dot{background:var(--green)}
 
   /* ---------- center ---------- */
   .titleblock{
@@ -140,7 +159,7 @@
     font-size:clamp(34px,4.6vw,58px);
     font-weight:900;font-stretch:80%;
     letter-spacing:.015em;line-height:.95;color:var(--plum);
-    text-transform:uppercase;
+    text-transform:uppercase;text-wrap:balance;
   }
   .titleblock p{
     margin-top:12px;font-size:15px;font-weight:600;letter-spacing:.26em;
@@ -152,7 +171,7 @@
     z-index:8;text-align:center;
     background:var(--card);border:1px solid var(--card-border);
     border-radius:14px;box-shadow:var(--shadow);
-    padding:10px 22px;min-width:170px;
+    padding:10px 22px;min-width:170px;max-width:min(430px,80vw);
   }
   .chip::before{
     content:"";position:absolute;top:-7px;left:50%;transform:translateX(-50%) rotate(45deg);
@@ -161,17 +180,26 @@
   }
   .chip .t1{font-size:15px;font-weight:800}
   .chip .t2{font-size:12px;font-weight:600;color:var(--ink-soft);margin-top:2px}
-  .chip .answers{display:none;gap:8px;justify-content:center;margin-top:9px}
+  .chip .streak{font-size:11px;font-weight:800;color:var(--mauve-deep);margin-top:4px;display:none}
+  .chip.quiz .streak{display:block}
+  .chip .answers{display:none;gap:8px;justify-content:center;margin-top:9px;flex-wrap:wrap}
   .chip.quiz .answers{display:flex}
   .chip .answers button{
     font-family:inherit;font-size:14px;font-weight:800;
-    width:42px;height:34px;border-radius:10px;cursor:pointer;
+    min-width:44px;height:34px;padding:0 12px;border-radius:10px;cursor:pointer;
     border:1px solid #d9d2c7;background:#fff;color:var(--ink);
     transition:background .15s,color .15s,transform .1s;
   }
   .chip .answers button:hover{background:#efe9df;transform:translateY(-1px)}
-  .chip .answers button.good{background:#7fb069;border-color:#7fb069;color:#fff}
+  .chip .answers button.good{background:var(--green);border-color:var(--green);color:#fff}
   .chip .answers button.bad{background:#c96a6a;border-color:#c96a6a;color:#fff}
+  .chip .hintbtn{
+    font-family:inherit;font-size:10.5px;font-weight:800;letter-spacing:.08em;
+    margin-top:8px;padding:4px 12px;border-radius:99px;cursor:pointer;
+    border:1px dashed #cbc2b4;background:none;color:var(--ink-soft);display:none;
+  }
+  .chip.quiz .hintbtn{display:inline-block}
+  .chip .hintbtn:hover{background:#efe9df}
   .chip.shake{animation:shake .4s ease}
   @keyframes shake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 7px))}75%{transform:translateX(calc(-50% + 7px))}}
 
@@ -192,6 +220,70 @@
     background:linear-gradient(135deg,#a289aa,#8d7295);color:#fff;
     box-shadow:0 8px 18px rgba(140,115,150,.35);
   }
+
+  /* ---------- lesson overlay ---------- */
+  .lesson-back{
+    position:fixed;inset:0;z-index:20;display:none;
+    align-items:center;justify-content:center;
+    background:rgba(240,235,225,.6);backdrop-filter:blur(7px);
+  }
+  .lesson-back.open{display:flex}
+  .lesson{
+    width:min(600px,92vw);max-height:84vh;overflow:auto;
+    padding:24px 26px;
+  }
+  .lesson-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding-bottom:14px;border-bottom:1px solid var(--card-border);margin-bottom:16px}
+  .lesson-head h3{font-size:16px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--plum)}
+  .lesson-x{
+    width:30px;height:30px;border-radius:10px;border:1px solid #d9d2c7;background:#fff;
+    font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;color:var(--ink);
+  }
+  .lesson-x:hover{background:#efe9df}
+  .lesson p{font-size:13.5px;line-height:1.6;color:#4a4452;margin-bottom:12px}
+  .lesson p b{color:var(--ink)}
+  .lesson .demo{
+    background:#f4efe6;border:1px solid var(--card-border);border-radius:14px;
+    padding:18px;margin:14px 0;display:flex;flex-direction:column;align-items:center;gap:13px;
+  }
+  .lesson .demo .big{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+  .lesson .demo .caption{font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--ink-soft);text-transform:uppercase}
+  .lesson .demo input[type=range]{width:min(300px,80%);accent-color:var(--mauve-deep)}
+  .cellgrid{display:grid;gap:3px}
+  .cellgrid i{width:17px;height:17px;border-radius:4px;background:var(--track)}
+  .cellgrid i.rose{background:var(--rose)}
+  .cellgrid i.peri{background:var(--peri)}
+  .cellgrid i.blue{background:var(--blue)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .tchip{
+    font-family:inherit;font-size:12px;font-weight:800;padding:7px 14px;border-radius:99px;
+    border:1px solid #d9d2c7;background:#fff;cursor:pointer;color:var(--ink);
+    transition:background .15s;
+  }
+  .tchip:hover{background:#efe9df}
+  .typecards{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .typecard{
+    flex:1;min-width:130px;background:#fff;border:1px solid var(--card-border);border-radius:12px;
+    padding:12px;text-align:center;
+  }
+  .typecard .tname{font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;margin:7px 0 3px}
+  .typecard .trule{font-size:11.5px;font-weight:600;color:var(--ink-soft)}
+  .check{
+    margin-top:16px;padding-top:16px;border-top:1px solid var(--card-border);
+  }
+  .check .q{font-size:13.5px;font-weight:800;margin-bottom:10px}
+  .check .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .check .opts button{
+    font-family:inherit;font-size:13px;font-weight:800;
+    padding:9px 16px;border-radius:10px;cursor:pointer;
+    border:1px solid #d9d2c7;background:#fff;color:var(--ink);
+    transition:background .15s,color .15s;
+  }
+  .check .opts button:hover{background:#efe9df}
+  .check .opts button.good{background:var(--green);border-color:var(--green);color:#fff}
+  .check .opts button.bad{background:#c96a6a;border-color:#c96a6a;color:#fff}
+  .check .done-note{font-size:12px;font-weight:800;color:var(--green);margin-top:10px;display:none}
+  .stepbar{display:flex;gap:8px;justify-content:center}
 
   .toast{
     position:fixed;left:50%;top:20px;transform:translate(-50%,-80px);
@@ -241,29 +333,35 @@
 
   <nav class="card concepts">
     <h2>GEOMETRY CONCEPTS</h2>
-    <button class="concept active" data-topic="Pythagorean Theorem">
+    <button class="concept active" data-topic="pythagorean">
       <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></span>
       Pythagorean Theorem
+      <span class="tick">✓</span>
     </button>
-    <button class="concept" data-topic="Right Angles">
+    <button class="concept" data-topic="rightangles">
       <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v14h14"/><path d="M6 12h6v6"/></svg></span>
       Right Angles
+      <span class="tick">✓</span>
     </button>
-    <button class="concept" data-topic="Square Numbers">
+    <button class="concept" data-topic="squares">
       <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 4v16M4 12h16"/></svg></span>
       Square Numbers
+      <span class="tick">✓</span>
     </button>
-    <button class="concept" data-topic="Area Calculation">
+    <button class="concept" data-topic="area">
       <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 15l6-6M15 15V9H9"/></svg></span>
       Area Calculation
+      <span class="tick">✓</span>
     </button>
-    <button class="concept" data-topic="Triangle Types">
+    <button class="concept" data-topic="types">
       <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14L5 5v14z"/></svg></span>
       Triangle Types
+      <span class="tick">✓</span>
     </button>
-    <button class="concept" data-topic="Proof Visuals">
+    <button class="concept" data-topic="proof">
       <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="7" r="2"/><circle cx="12" cy="17" r="2"/><path d="M8 8l3 7M16 8l-3 7"/></svg></span>
       Proof Visuals
+      <span class="tick">✓</span>
     </button>
   </nav>
 </aside>
@@ -278,6 +376,8 @@
   <div class="t1" id="chipT1">3:4:5 Triangle</div>
   <div class="t2" id="chipT2">a&sup2; + b&sup2; = c&sup2;</div>
   <div class="answers" id="chipAnswers"></div>
+  <button class="hintbtn" id="hintBtn">HINT</button>
+  <div class="streak" id="chipStreak"></div>
 </div>
 
 <div class="modes card">
@@ -315,21 +415,39 @@
     <div class="formula">a&sup2; + b&sup2; = c&sup2;</div>
 
     <div class="siderow" id="rowA">
-      <div class="rowtop"><span class="label">SIDE <b>a</b></span><span class="units">3 units</span></div>
-      <div class="bar a"><i></i></div>
+      <div class="rowtop">
+        <span class="label">SIDE <b>a</b></span>
+        <span class="stepper">
+          <button class="stepbtn" data-side="a" data-d="-1" aria-label="decrease a">&minus;</button>
+          <span class="units" id="unitsA">3 units</span>
+          <button class="stepbtn" data-side="a" data-d="1" aria-label="increase a">+</button>
+        </span>
+      </div>
+      <div class="bar a"><i id="barA"></i></div>
     </div>
     <div class="siderow" id="rowB">
-      <div class="rowtop"><span class="label">SIDE <b>b</b></span><span class="units">4 units</span></div>
-      <div class="bar b"><i></i></div>
+      <div class="rowtop">
+        <span class="label">SIDE <b>b</b></span>
+        <span class="stepper">
+          <button class="stepbtn" data-side="b" data-d="-1" aria-label="decrease b">&minus;</button>
+          <span class="units" id="unitsB">4 units</span>
+          <button class="stepbtn" data-side="b" data-d="1" aria-label="increase b">+</button>
+        </span>
+      </div>
+      <div class="bar b"><i id="barB"></i></div>
     </div>
     <div class="siderow" id="rowC">
-      <div class="rowtop"><span class="label">HYPOTENUSE <b>c</b></span><span class="units">5 units</span></div>
-      <div class="bar c"><i></i></div>
+      <div class="rowtop">
+        <span class="label">HYPOTENUSE <b>c</b></span>
+        <span class="units" id="unitsC">5 units</span>
+      </div>
+      <div class="bar c"><i id="barC"></i></div>
     </div>
 
     <div class="totals">
       <div class="label">TOTAL SQUARES</div>
-      <div class="sum">9 + 16 = 25</div>
+      <div class="sum" id="sumLine">9 + 16 = 25</div>
+      <div class="subnote" id="sumNote"></div>
     </div>
   </div>
 
@@ -342,6 +460,17 @@
     </ul>
   </div>
 </aside>
+
+<!-- ================= LESSON OVERLAY ================= -->
+<div class="lesson-back" id="lessonBack">
+  <div class="lesson card" role="dialog" aria-modal="true">
+    <div class="lesson-head">
+      <h3 id="lessonTitle"></h3>
+      <button class="lesson-x" id="lessonClose" aria-label="close">✕</button>
+    </div>
+    <div id="lessonBody"></div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 

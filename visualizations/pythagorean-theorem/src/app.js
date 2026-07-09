@@ -98,81 +98,452 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-/* ---------------- UI logic ---------------- */
+/* ---------------- shared helpers ---------------- */
 const $ = (id) => document.getElementById(id);
 const chip = $('chip'), chipT1 = $('chipT1'), chipT2 = $('chipT2'), chipAnswers = $('chipAnswers');
+const chipStreak = $('chipStreak'), hintBtn = $('hintBtn');
 const toast = $('toast');
 let toastTimer;
 function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+}
+function el(tag, cls, html) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
 }
 
-/* sidebar topics */
-document.querySelectorAll('.concept').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    if (btn.classList.contains('active')) return;
-    showToast(`"${btn.dataset.topic}" — coming soon. Stay on the Pythagorean Theorem for now!`);
-  });
-});
-document.querySelector('.burger').addEventListener('click', () => showToast('Menu — coming soon'));
-
-/* XP / progress */
-let xp = 22;
+/* ---------------- progress (persisted) ---------------- */
+const DEFAULT_PROGRESS = { xp: 22, level: 10, done: {}, correct: 0, streakBest: 0 };
+let progress = { ...DEFAULT_PROGRESS };
+try {
+  const saved = JSON.parse(localStorage.getItem('mathExplorerProgress'));
+  if (saved && typeof saved === 'object') progress = { ...DEFAULT_PROGRESS, ...saved };
+} catch (e) { /* fresh start */ }
+function save() {
+  try { localStorage.setItem('mathExplorerProgress', JSON.stringify(progress)); } catch (e) { /* private mode */ }
+}
+function renderProgress() {
+  $('xpFill').style.width = progress.xp + '%';
+  $('levelLabel').textContent = 'LEVEL ' + progress.level;
+  document.querySelectorAll('.concept').forEach((b) => b.classList.toggle('done', !!progress.done[b.dataset.topic]));
+  $('obj1').classList.toggle('done', !!progress.done.rightangles);
+  $('obj2').classList.toggle('done', progress.correct >= 3);
+  $('obj3').classList.toggle('done', !!(progress.done.squares || progress.done.proof));
+}
 function addXP(n) {
-  xp = Math.min(100, xp + n);
-  $('xpFill').style.width = xp + '%';
-  if (xp >= 100) {
-    xp = 0;
-    $('levelLabel').textContent = 'LEVEL 11';
-    showToast('Level up! Welcome to Level 11 🎉');
+  progress.xp += n;
+  if (progress.xp >= 100) {
+    progress.xp -= 100;
+    progress.level++;
+    showToast(`Level up! Welcome to Level ${progress.level} 🎉`);
+  }
+  save();
+  renderProgress();
+}
+function completeTopic(topic, name) {
+  if (progress.done[topic]) { showToast(`"${name}" already mastered ✓`); return; }
+  progress.done[topic] = true;
+  showToast(`Topic complete: ${name} ✓  +15 XP`);
+  addXP(15);
+}
+renderProgress();
+
+/* ---------------- adjustable triangle ---------------- */
+const tri = { a: 3, b: 4 };
+const isPerfect = () => Number.isInteger(Math.sqrt(tri.a * tri.a + tri.b * tri.b));
+const hyp = () => Math.sqrt(tri.a * tri.a + tri.b * tri.b);
+const fmt = (x) => (Number.isInteger(x) ? String(x) : x.toFixed(2));
+
+function renderTriangle() {
+  const a = tri.a, b = tri.b, c = hyp();
+  $('unitsA').textContent = a + ' units';
+  $('unitsB').textContent = b + ' units';
+  $('unitsC').textContent = fmt(c) + ' units';
+  $('barA').style.width = Math.min(100, a * 15.3) + '%';
+  $('barB').style.width = Math.min(100, b * 15.3) + '%';
+  $('barC').style.width = Math.min(100, c * 15.3) + '%';
+  $('sumLine').textContent = `${a * a} + ${b * b} = ${a * a + b * b}`;
+  $('sumNote').textContent = isPerfect()
+    ? `perfect triple — c = ${c} exactly`
+    : `c = √${a * a + b * b} ≈ ${c.toFixed(2)}`;
+  if (mode === 'explore') setExploreChip();
+}
+function setExploreChip() {
+  const c = hyp();
+  if (isPerfect()) {
+    chipT1.textContent = `${tri.a}:${tri.b}:${c} Triangle`;
+    chipT2.innerHTML = 'a&sup2; + b&sup2; = c&sup2;';
+  } else {
+    chipT1.textContent = `Right Triangle  a=${tri.a}, b=${tri.b}`;
+    chipT2.textContent = `c = √${tri.a * tri.a + tri.b * tri.b} ≈ ${c.toFixed(2)}`;
   }
 }
+function setSides(a, b, announce) {
+  tri.a = Math.min(12, Math.max(1, a));
+  tri.b = Math.min(12, Math.max(1, b));
+  renderTriangle();
+  if (announce) showToast(`Triangle set to a=${tri.a}, b=${tri.b} — check the panel!`);
+}
+document.querySelectorAll('.stepbtn').forEach((btn) => {
+  if (!btn.dataset.side) return;
+  btn.addEventListener('click', () => {
+    const d = Number(btn.dataset.d);
+    if (btn.dataset.side === 'a') setSides(tri.a + d, tri.b);
+    else setSides(tri.a, tri.b + d);
+    if (mode === 'practice') showPracticeStep();
+  });
+});
+
+/* ---------------- lessons ---------------- */
+const lessonBack = $('lessonBack'), lessonTitle = $('lessonTitle'), lessonBody = $('lessonBody');
+
+function addCheck(container, topic, name, question, options, answer, explain) {
+  const wrap = el('div', 'check');
+  wrap.appendChild(el('div', 'label', 'CHECK YOURSELF'));
+  wrap.appendChild(el('div', 'q', question));
+  const opts = el('div', 'opts');
+  const note = el('div', 'done-note');
+  options.forEach((o) => {
+    const b = el('button', '', String(o));
+    b.addEventListener('click', () => {
+      if (String(o) === String(answer)) {
+        b.classList.add('good');
+        note.style.display = 'block';
+        note.textContent = `✓ Correct — ${explain}`;
+        completeTopic(topic, name);
+      } else {
+        b.classList.add('bad');
+        setTimeout(() => b.classList.remove('bad'), 700);
+      }
+    });
+    opts.appendChild(b);
+  });
+  wrap.appendChild(opts);
+  wrap.appendChild(note);
+  container.appendChild(wrap);
+}
+
+function grid(rowsN, colsN, colorFor) {
+  const g = el('div', 'cellgrid');
+  g.style.gridTemplateColumns = `repeat(${colsN}, 17px)`;
+  for (let i = 0; i < rowsN * colsN; i++) {
+    const cell = el('i');
+    const cls = colorFor ? colorFor(i) : '';
+    if (cls) cell.classList.add(cls);
+    g.appendChild(cell);
+  }
+  return g;
+}
+
+const LESSONS = {
+  pythagorean: {
+    name: 'Pythagorean Theorem',
+    render(body) {
+      body.appendChild(el('p', '', 'In any <b>right triangle</b>, the square built on the hypotenuse (the longest side, opposite the right angle) has exactly the same area as the two smaller squares combined: <b>a&sup2; + b&sup2; = c&sup2;</b>. That is what the 3D model shows — 9 cubes + 16 cubes = 25 cubes.'));
+      const demo = el('div', 'demo');
+      demo.innerHTML = `<svg viewBox="-75 -55 250 230" width="240" height="220" aria-label="right triangle with squares on each side">
+        <polygon points="20,100 80,100 80,160 20,160" fill="#a5798d" opacity=".45" stroke="#a5798d"/>
+        <polygon points="20,20 20,100 -60,100 -60,20" fill="#7b8fd4" opacity=".45" stroke="#7b8fd4"/>
+        <polygon points="80,100 20,20 100,-40 160,40" fill="#6b84d8" opacity=".4" stroke="#6b84d8"/>
+        <polygon points="20,100 80,100 20,20" fill="#fbf9f4" stroke="#2e2a33" stroke-width="1.6"/>
+        <rect x="20" y="88" width="12" height="12" fill="none" stroke="#2e2a33" stroke-width="1.4"/>
+        <text x="50" y="134" font-size="13" font-weight="700" text-anchor="middle" fill="#2e2a33">a&#178;</text>
+        <text x="-20" y="64" font-size="13" font-weight="700" text-anchor="middle" fill="#2e2a33">b&#178;</text>
+        <text x="90" y="34" font-size="13" font-weight="700" text-anchor="middle" fill="#2e2a33">c&#178;</text>
+      </svg>`;
+      demo.appendChild(el('div', 'caption', 'The two small squares tile the big one'));
+      body.appendChild(demo);
+      body.appendChild(el('p', '', 'Whole-number side lengths that fit the formula are called <b>Pythagorean triples</b>. Tap one to load it into the Theorem Details panel:'));
+      const chips = el('div', 'chips');
+      [[3, 4, 5], [6, 8, 10], [5, 12, 13], [9, 12, 15], [8, 15, 17]].forEach(([a, b, c]) => {
+        const btn = el('button', 'tchip', `${a} - ${b} - ${c}`);
+        btn.addEventListener('click', () => { setSides(a, b, true); });
+        chips.appendChild(btn);
+      });
+      body.appendChild(chips);
+      addCheck(body, 'pythagorean', this.name,
+        'Which of these is NOT a right triangle?',
+        ['6 - 8 - 10', '5 - 12 - 13', '4 - 5 - 6'], '4 - 5 - 6',
+        '4² + 5² = 41, but 6² = 36. The formula fails, so no right angle.');
+    },
+  },
+
+  rightangles: {
+    name: 'Right Angles',
+    render(body) {
+      body.appendChild(el('p', '', 'A <b>right angle</b> measures exactly <b>90°</b> — a perfect quarter turn, like the corner of a page. The Pythagorean theorem only works when the triangle contains one. Drag the slider until the angle snaps to 90°:'));
+      const demo = el('div', 'demo');
+      const svgWrap = el('div');
+      const big = el('div', 'big', '60°');
+      const slider = document.createElement('input');
+      slider.type = 'range'; slider.min = '20'; slider.max = '160'; slider.value = '60';
+      const draw = (deg) => {
+        const rad = (180 - deg) * Math.PI / 180;
+        const x = 90 + 80 * Math.cos(rad), y = 100 - 80 * Math.sin(rad);
+        const right = deg === 90;
+        svgWrap.innerHTML = `<svg viewBox="0 0 190 115" width="260" height="158">
+          <line x1="90" y1="100" x2="180" y2="100" stroke="#2e2a33" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="90" y1="100" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${right ? '#7fb069' : '#8a6f94'}" stroke-width="2.5" stroke-linecap="round"/>
+          ${right ? '<rect x="90" y="82" width="18" height="18" fill="none" stroke="#7fb069" stroke-width="2"/>' : `<path d="M 118 100 A 28 28 0 0 0 ${(90 + 28 * Math.cos(rad)).toFixed(1)} ${(100 - 28 * Math.sin(rad)).toFixed(1)}" fill="none" stroke="#8a6f94" stroke-width="2"/>`}
+        </svg>`;
+        big.textContent = deg + '°' + (right ? ' — right angle!' : '');
+        big.style.color = right ? '#7fb069' : '';
+      };
+      slider.addEventListener('input', () => draw(Number(slider.value)));
+      draw(60);
+      demo.appendChild(svgWrap);
+      demo.appendChild(big);
+      demo.appendChild(slider);
+      demo.appendChild(el('div', 'caption', 'The little square marks a true 90° corner'));
+      body.appendChild(demo);
+      addCheck(body, 'rightangles', this.name,
+        'How many degrees are in a right angle?',
+        ['45°', '90°', '180°'], '90°',
+        'a right angle is a quarter of a full 360° turn.');
+    },
+  },
+
+  squares: {
+    name: 'Square Numbers',
+    render(body) {
+      body.appendChild(el('p', '', '<b>Squaring</b> a number means multiplying it by itself: n&sup2; = n × n. The name is literal — n&sup2; is how many unit cells fill a square with side n. That is why the theorem talks about squares on each side.'));
+      const demo = el('div', 'demo');
+      const big = el('div', 'big');
+      const holder = el('div');
+      const stepbar = el('div', 'stepbar');
+      let n = 5;
+      const draw = () => {
+        holder.innerHTML = '';
+        holder.appendChild(grid(n, n, () => 'peri'));
+        big.textContent = `${n}² = ${n} × ${n} = ${n * n}`;
+      };
+      const minus = el('button', 'stepbtn', '−'), plus = el('button', 'stepbtn', '+');
+      minus.addEventListener('click', () => { n = Math.max(1, n - 1); draw(); });
+      plus.addEventListener('click', () => { n = Math.min(10, n + 1); draw(); });
+      stepbar.append(minus, plus);
+      draw();
+      demo.append(holder, big, stepbar);
+      demo.appendChild(el('div', 'caption', 'Count the cells — a square number is a square of cells'));
+      body.appendChild(demo);
+      addCheck(body, 'squares', this.name,
+        'What is 7² ?', ['14', '49', '77'], '49',
+        '7 × 7 = 49 — fourteen would be 7 + 7, a common mix-up.');
+    },
+  },
+
+  area: {
+    name: 'Area Calculation',
+    render(body) {
+      body.appendChild(el('p', '', '<b>Area</b> is the number of unit squares needed to cover a shape. For a rectangle it is <b>width × height</b>; a square is the special case where both are equal, giving n&sup2;. Resize the rectangle and watch the count:'));
+      const demo = el('div', 'demo');
+      const big = el('div', 'big');
+      const holder = el('div');
+      let w = 5, h = 3;
+      const draw = () => {
+        holder.innerHTML = '';
+        holder.appendChild(grid(h, w, () => 'rose'));
+        big.textContent = `Area = ${w} × ${h} = ${w * h} square units`;
+      };
+      const bar = el('div', 'stepbar');
+      [['w −', () => (w = Math.max(1, w - 1))], ['w +', () => (w = Math.min(10, w + 1))],
+       ['h −', () => (h = Math.max(1, h - 1))], ['h +', () => (h = Math.min(8, h + 1))]].forEach(([t, fn]) => {
+        const b = el('button', 'stepbtn', t);
+        b.style.width = 'auto'; b.style.padding = '0 9px';
+        b.addEventListener('click', () => { fn(); draw(); });
+        bar.appendChild(b);
+      });
+      draw();
+      demo.append(holder, big, bar);
+      body.appendChild(demo);
+      addCheck(body, 'area', this.name,
+        'What is the area of a 5 × 3 rectangle?', ['8', '15', '16'], '15',
+        '5 × 3 = 15. Adding the sides (5 + 3 = 8) gives half the perimeter, not the area.');
+    },
+  },
+
+  types: {
+    name: 'Triangle Types',
+    render(body) {
+      body.appendChild(el('p', '', 'Compare <b>a&sup2; + b&sup2;</b> with <b>c&sup2;</b> (where c is the longest side) and the triangle tells you its biggest angle — no protractor needed:'));
+      const cards = el('div', 'typecards');
+      [
+        ['M35 46 L10 46 L28 8 Z', 'Acute', 'a² + b² &gt; c²', 'biggest angle &lt; 90°'],
+        ['M10 46 L10 10 L40 46 Z', 'Right', 'a² + b² = c²', 'one angle exactly 90°'],
+        ['M4 46 L46 46 L38 30 Z', 'Obtuse', 'a² + b² &lt; c²', 'biggest angle &gt; 90°'],
+      ].forEach(([d, name, rule, sub]) => {
+        const c = el('div', 'typecard');
+        c.innerHTML = `<svg viewBox="0 0 50 50" width="46" height="46"><path d="${d}" fill="#ded7e8" stroke="#8a6f94" stroke-width="2" stroke-linejoin="round"/></svg>
+          <div class="tname">${name}</div><div class="trule">${rule}<br>${sub}</div>`;
+        cards.appendChild(c);
+      });
+      body.appendChild(cards);
+      body.appendChild(el('p', '', 'Example: sides 2, 3, 4 → 2&sup2; + 3&sup2; = 13 and 4&sup2; = 16. Since 13 &lt; 16, the triangle is obtuse.'));
+      addCheck(body, 'types', this.name,
+        'Sides 6, 8, 10: since 36 + 64 = 100 = 10², the triangle is…',
+        ['Acute', 'Right', 'Obtuse'], 'Right',
+        'a² + b² equals c² exactly, so it contains a perfect 90° corner.');
+    },
+  },
+
+  proof: {
+    name: 'Proof Visuals',
+    render(body) {
+      body.appendChild(el('p', '', 'Why does it work? Count the unit squares. Step through the proof: the 9 cells of a&sup2; and the 16 cells of b&sup2; are exactly enough to fill c&sup2; — all 25 of it, with nothing left over.'));
+      const demo = el('div', 'demo');
+      const holder = el('div');
+      holder.style.display = 'flex'; holder.style.gap = '22px'; holder.style.alignItems = 'flex-end';
+      const big = el('div', 'big');
+      let step = 0;
+      const draw = () => {
+        holder.innerHTML = '';
+        const gA = grid(3, 3, () => (step >= 1 ? 'rose' : ''));
+        const gB = grid(4, 4, () => (step >= 2 ? 'peri' : ''));
+        const gC = grid(5, 5, (i) => (step >= 3 ? (i < 9 ? 'rose' : 'peri') : ''));
+        [['a² = 9', gA], ['b² = 16', gB], ['c² = 25', gC]].forEach(([cap, g]) => {
+          const w = el('div');
+          w.style.textAlign = 'center';
+          w.appendChild(g);
+          const capEl = el('div', 'caption', cap);
+          capEl.style.textTransform = 'none';
+          w.appendChild(capEl);
+          holder.appendChild(w);
+        });
+        big.textContent = ['Three empty squares', 'Count a²: 9 cells', 'Count b²: 16 more cells', '9 + 16 fill c² exactly: 25!'][step];
+      };
+      const bar = el('div', 'stepbar');
+      const back = el('button', 'stepbtn', '←'), next = el('button', 'stepbtn', '→');
+      back.addEventListener('click', () => { step = Math.max(0, step - 1); draw(); });
+      next.addEventListener('click', () => { step = Math.min(3, step + 1); draw(); });
+      bar.append(back, next);
+      draw();
+      demo.append(holder, big, bar);
+      demo.appendChild(el('div', 'caption', 'Use the arrows to step through the proof'));
+      body.appendChild(demo);
+      addCheck(body, 'proof', this.name,
+        'The squares on the two short sides hold 9 + 16 cells. The square on the hypotenuse holds…',
+        ['24', '25', '26'], '25',
+        'exactly 9 + 16 — the areas match perfectly, which IS the theorem.');
+    },
+  },
+};
+
+function openLesson(topic) {
+  const lesson = LESSONS[topic];
+  if (!lesson) return;
+  lessonTitle.textContent = lesson.name;
+  lessonBody.innerHTML = '';
+  lesson.render(lessonBody);
+  lessonBack.classList.add('open');
+}
+$('lessonClose').addEventListener('click', () => lessonBack.classList.remove('open'));
+lessonBack.addEventListener('click', (e) => { if (e.target === lessonBack) lessonBack.classList.remove('open'); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') lessonBack.classList.remove('open'); });
+
+document.querySelectorAll('.concept').forEach((btn) => {
+  btn.addEventListener('click', () => openLesson(btn.dataset.topic));
+});
+document.querySelector('.burger').addEventListener('click', () => showToast('Complete all six topics to master the unit!'));
 
 /* ---------------- modes ---------------- */
+let mode = 'explore';
 let practiceTimer = null;
+let practiceIdx = 0;
 const rows = { a: $('rowA'), b: $('rowB'), c: $('rowC') };
 
-const practiceSteps = [
-  { row: 'a', t1: 'Side a = 3 units', t2: 'a² = 9 squares', obj: 'obj1' },
-  { row: 'b', t1: 'Side b = 4 units', t2: 'b² = 16 squares', obj: 'obj3' },
-  { row: 'c', t1: 'Hypotenuse c = 5 units', t2: 'c² = 9 + 16 = 25 squares', obj: 'obj2' },
-];
-
+function practiceSteps() {
+  const a = tri.a, b = tri.b, cc = tri.a * tri.a + tri.b * tri.b, c = hyp();
+  return [
+    { row: 'a', t1: `Side a = ${a} units`, t2: `a² = ${a * a} squares` },
+    { row: 'b', t1: `Side b = ${b} units`, t2: `b² = ${b * b} squares` },
+    { row: 'c', t1: `Hypotenuse c = ${fmt(c)} units`, t2: `c² = ${a * a} + ${b * b} = ${cc} squares` },
+  ];
+}
+function showPracticeStep() {
+  const s = practiceSteps()[practiceIdx % 3];
+  Object.values(rows).forEach((r) => r.classList.remove('pulse'));
+  rows[s.row].classList.add('pulse');
+  chipT1.textContent = s.t1;
+  chipT2.textContent = s.t2;
+}
 function clearPractice() {
   clearInterval(practiceTimer);
   practiceTimer = null;
   Object.values(rows).forEach((r) => r.classList.remove('pulse'));
 }
 
-const quizzes = [
-  { q: 'If a = 3 and b = 4, c = ?', opts: [4, 5, 6], ans: 5 },
-  { q: 'If a = 6 and b = 8, c = ?', opts: [9, 10, 12], ans: 10 },
-  { q: 'If a = 5 and b = 12, c = ?', opts: [13, 15, 17], ans: 13 },
-  { q: 'If a = 9 and b = 12, c = ?', opts: [14, 15, 16], ans: 15 },
-];
-let quizIdx = 0;
+/* ---------------- quiz ---------------- */
+const TRIPLES = [[3, 4, 5], [6, 8, 10], [5, 12, 13], [9, 12, 15], [8, 15, 17], [12, 16, 20], [7, 24, 25], [20, 21, 29]];
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+let streak = 0;
+let lastTriple = null;
+let currentQuiz = null;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function genQuiz() {
+  let t = pick(TRIPLES);
+  while (t === lastTriple) t = pick(TRIPLES);
+  lastTriple = t;
+  const [a, b, c] = t;
+  const explain = `${a}² + ${b}² = ${a * a} + ${b * b} = ${c * c} = ${c}²`;
+  const type = pick(['hyp', 'hyp', 'leg', 'verify', 'word']);
+  if (type === 'hyp') {
+    return { q: `If a = ${a} and b = ${b}, what is c?`, opts: shuffle([c, c - 1, c + 2]), ans: c, explain,
+      hint: `a² + b² = ${a * a + b * b}. Which option, squared, gives ${c * c}?` };
+  }
+  if (type === 'leg') {
+    return { q: `If c = ${c} and a = ${a}, what is b?`, opts: shuffle([b, b + 1, b > 2 ? b - 2 : b + 3]), ans: b, explain,
+      hint: `Rearrange: b² = c² − a² = ${c * c} − ${a * a} = ${c * c - a * a}.` };
+  }
+  if (type === 'verify') {
+    const real = Math.random() < 0.5;
+    const sides = real ? [a, b, c] : [a, b, c + 1];
+    const sum = sides[0] ** 2 + sides[1] ** 2, csq = sides[2] ** 2;
+    return { q: `Sides ${sides[0]}, ${sides[1]}, ${sides[2]} — is it a right triangle?`, opts: ['YES', 'NO'],
+      ans: real ? 'YES' : 'NO',
+      explain: `${sides[0]}² + ${sides[1]}² = ${sum} and ${sides[2]}² = ${csq} — ${sum === csq ? 'they match' : 'they differ'}`,
+      hint: `Check whether ${sides[0]}² + ${sides[1]}² equals ${sides[2]}².` };
+  }
+  return { q: `A ladder's base sits ${a} m from a wall and reaches ${b} m up it. How long is the ladder?`,
+    opts: shuffle([c, c - 1, c + 2]).map((v) => v + ' m'), ans: c + ' m', explain,
+    hint: `The wall and ground meet at 90° — the ladder is the hypotenuse.` };
+}
 
 function askQuiz() {
-  const qz = quizzes[quizIdx % quizzes.length];
+  currentQuiz = genQuiz();
   chip.classList.add('quiz');
-  chipT1.textContent = qz.q;
+  chipT1.textContent = currentQuiz.q;
   chipT2.textContent = 'a² + b² = c²';
+  chipStreak.textContent = streak > 0 ? `🔥 streak ${streak}` : 'Answer to start a streak';
   chipAnswers.innerHTML = '';
-  qz.opts.forEach((v) => {
-    const b = document.createElement('button');
-    b.textContent = v;
+  currentQuiz.opts.forEach((v) => {
+    const b = el('button', '', String(v));
     b.addEventListener('click', () => {
-      if (v === qz.ans) {
+      if (String(v) === String(currentQuiz.ans)) {
         b.classList.add('good');
-        chipT1.textContent = `Correct! c = ${qz.ans}`;
-        $('obj2').classList.add('done');
+        streak++;
+        progress.correct++;
+        progress.streakBest = Math.max(progress.streakBest, streak);
+        chipT1.textContent = 'Correct!';
+        chipT2.textContent = currentQuiz.explain;
+        chipStreak.textContent = `🔥 streak ${streak}  ·  best ${progress.streakBest}`;
         addXP(12);
-        quizIdx++;
-        setTimeout(askQuiz, 1400);
+        setTimeout(askQuiz, 1800);
       } else {
+        streak = 0;
+        chipStreak.textContent = 'Streak reset — try again!';
         b.classList.add('bad');
         chip.classList.add('shake');
         setTimeout(() => chip.classList.remove('shake'), 450);
@@ -182,32 +553,29 @@ function askQuiz() {
     chipAnswers.appendChild(b);
   });
 }
+hintBtn.addEventListener('click', () => {
+  if (currentQuiz) chipT2.textContent = '💡 ' + currentQuiz.hint;
+});
 
 function setMode(m) {
+  mode = m;
   document.querySelectorAll('.mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
   clearPractice();
   chip.classList.remove('quiz');
   controls.autoRotate = m === 'explore';
 
-  if (m === 'explore') {
-    chipT1.textContent = '3:4:5 Triangle';
-    chipT2.textContent = 'a² + b² = c²';
-  }
+  if (m === 'explore') setExploreChip();
   if (m === 'practice') {
-    let i = 0;
-    const step = () => {
-      const s = practiceSteps[i % practiceSteps.length];
-      Object.values(rows).forEach((r) => r.classList.remove('pulse'));
-      rows[s.row].classList.add('pulse');
-      chipT1.textContent = s.t1;
-      chipT2.textContent = s.t2;
-      $(s.obj).classList.add('done');
-      if (i > 0 && i % practiceSteps.length === 0) addXP(4);
-      i++;
-    };
-    step();
-    practiceTimer = setInterval(step, 2600);
+    practiceIdx = 0;
+    showPracticeStep();
+    practiceTimer = setInterval(() => {
+      practiceIdx++;
+      if (practiceIdx % 3 === 0) addXP(4);
+      showPracticeStep();
+    }, 2600);
   }
   if (m === 'test') askQuiz();
 }
 document.querySelectorAll('.mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+renderTriangle();
