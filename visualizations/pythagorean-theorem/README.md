@@ -11,10 +11,21 @@ the Three.js engine are embedded inline), so it works offline with no server.
 ## Features
 
 - **3D model viewer** — drag to rotate, scroll to zoom, gentle auto-rotation
-  with a warm pulsing glow inside each square.
-- **Explore mode** — free-orbit the model.
-- **Practice mode** — steps through sides a, b, and c, pulsing the matching
-  bar in the Theorem Details panel and explaining each square count.
+  with a warm pulsing glow. The mesh is segmented into its three squares at
+  load time (connected-component analysis), so each square is color-coded to
+  match the panel (rose a², periwinkle b², blue c²) with the triangle frame
+  glowing warm between them.
+- **Numbers on the model** — floating labels (a² = 9, b² = 16, c² = 25) hover
+  over each square; in Test mode they switch to letters only so they don't
+  give answers away. Toggle with the LABELS button.
+- **Tap to count** — click any square and a warm tile grid fills its face
+  cell by cell (3×3, 4×4, 5×5, fitted via min-area rectangle) while the label
+  and callout count along.
+- **Explode view** — separates the three squares from the triangle frame to
+  show how the sculpture is assembled.
+- **Explore mode** — free-orbit the model, hover highlights each square.
+- **Practice mode** — steps through sides a, b, and c: the matching 3D square
+  pulses and runs its counting animation while the panel bar pulses in sync.
 - **Test mode** — mixed question types (find the hypotenuse, find a missing
   leg, verify a right triangle, ladder word problems) with hints, streak
   tracking, and a worked explanation after every correct answer.

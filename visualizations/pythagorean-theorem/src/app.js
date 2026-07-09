@@ -41,62 +41,289 @@ const glowGroup = new THREE.Group();
 });
 scene.add(glowGroup);
 
-/* ---------------- model ---------------- */
+/* soft ground shadow */
+{
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 256;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(128, 128, 10, 128, 128, 126);
+  g.addColorStop(0, 'rgba(90,75,100,.30)');
+  g.addColorStop(1, 'rgba(90,75,100,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 256);
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.7, 1.35),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = -1.22;
+  scene.add(shadow);
+}
+
+/* ---------------- geometry analysis helpers ---------------- */
+
+/* connected components over a non-indexed BufferGeometry (weld by rounded position) */
+function splitComponents(geom) {
+  const pos = geom.attributes.position;
+  const triCount = pos.count / 3;
+  const parent = new Int32Array(triCount);
+  for (let i = 0; i < triCount; i++) parent[i] = i;
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[a] = b; };
+  const vmap = new Map();
+  for (let t = 0; t < triCount; t++) {
+    for (let k = 0; k < 3; k++) {
+      const i = t * 3 + k;
+      const key = `${Math.round(pos.getX(i) * 1500)},${Math.round(pos.getY(i) * 1500)},${Math.round(pos.getZ(i) * 1500)}`;
+      const seen = vmap.get(key);
+      if (seen === undefined) vmap.set(key, t);
+      else union(t, seen);
+    }
+  }
+  const groups = new Map();
+  for (let t = 0; t < triCount; t++) {
+    const r = find(t);
+    if (!groups.has(r)) groups.set(r, []);
+    groups.get(r).push(t);
+  }
+  return [...groups.values()];
+}
+
+function geomFromTris(srcPos, tris) {
+  const arr = new Float32Array(tris.length * 9);
+  let o = 0;
+  for (const t of tris) {
+    for (let k = 0; k < 3; k++) {
+      const i = t * 3 + k;
+      arr[o++] = srcPos.getX(i); arr[o++] = srcPos.getY(i); arr[o++] = srcPos.getZ(i);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* front-facing projected area + centroid + bbox of a component */
+function compStats(srcPos, tris) {
+  let frontArea = 0, cx = 0, cy = 0, n = 0;
+  const bb = { minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9, maxZ: -1e9 };
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), cr = new THREE.Vector3();
+  for (const t of tris) {
+    a.fromBufferAttribute(srcPos, t * 3); b.fromBufferAttribute(srcPos, t * 3 + 1); c.fromBufferAttribute(srcPos, t * 3 + 2);
+    for (const v of [a, b, c]) {
+      if (v.x < bb.minX) bb.minX = v.x; if (v.x > bb.maxX) bb.maxX = v.x;
+      if (v.y < bb.minY) bb.minY = v.y; if (v.y > bb.maxY) bb.maxY = v.y;
+      if (v.z > bb.maxZ) bb.maxZ = v.z;
+    }
+    cx += (a.x + b.x + c.x) / 3; cy += (a.y + b.y + c.y) / 3; n++;
+    ab.subVectors(b, a); ac.subVectors(c, a); cr.crossVectors(ab, ac);
+    const area = cr.length() / 2;
+    if (area > 0 && cr.z / cr.length() > 0.6 && (a.z + b.z + c.z) / 3 > 0) frontArea += area;
+  }
+  return { frontArea, centroid: { x: cx / n, y: cy / n }, bb };
+}
+
+/* convex hull (monotone chain) + min-area rectangle via rotating edges */
+function convexHull(pts) {
+  pts = [...pts].sort((p, q) => p.x - q.x || p.y - q.y);
+  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower = [];
+  for (const p of pts) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop(); lower.push(p); }
+  const upper = [];
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop(); upper.push(p); }
+  upper.pop(); lower.pop();
+  return lower.concat(upper);
+}
+function minAreaRect(pts) {
+  const hull = convexHull(pts);
+  let best = null;
+  for (let i = 0; i < hull.length; i++) {
+    const p = hull[i], q = hull[(i + 1) % hull.length];
+    const ang = Math.atan2(q.y - p.y, q.x - p.x);
+    const cos = Math.cos(-ang), sin = Math.sin(-ang);
+    let minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
+    for (const pt of hull) {
+      const x = pt.x * cos - pt.y * sin, y = pt.x * sin + pt.y * cos;
+      if (x < minx) minx = x; if (x > maxx) maxx = x;
+      if (y < miny) miny = y; if (y > maxy) maxy = y;
+    }
+    const area = (maxx - minx) * (maxy - miny);
+    if (!best || area < best.area) best = { area, ang, minx, maxx, miny, maxy };
+  }
+  const rcx = (best.minx + best.maxx) / 2, rcy = (best.miny + best.maxy) / 2;
+  const cos = Math.cos(best.ang), sin = Math.sin(best.ang);
+  return {
+    center: { x: rcx * cos - rcy * sin, y: rcx * sin + rcy * cos },
+    width: best.maxx - best.minx,
+    height: best.maxy - best.miny,
+    angle: best.ang,
+  };
+}
+
+/* ---------------- floating labels (canvas sprites) ---------------- */
+function makeLabel() {
+  const cv = document.createElement('canvas');
+  cv.width = 380; cv.height = 150;
+  const ctx = cv.getContext('2d');
+  const tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = 4;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.renderOrder = 20;
+  sprite.scale.set(0.56, 0.221, 1);
+  const set = (text) => {
+    ctx.clearRect(0, 0, 380, 150);
+    ctx.fillStyle = 'rgba(251,249,244,.97)';
+    ctx.strokeStyle = '#ddd4c4';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(6, 6, 368, 138, 30);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#6b5468';
+    ctx.font = '700 72px Archivo, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 190, 80);
+    tex.needsUpdate = true;
+  };
+  return { sprite, set };
+}
+
+/* ---------------- model: load, segment, decorate ---------------- */
 const model = new THREE.Group();
 scene.add(model);
+const parts = {};           // a | b | c -> part record
+let frameGroup = null;
+const raycastTargets = [];
+
+const PART_STYLE = {
+  a: { color: 0xb98ca6, n: 3 },
+  b: { color: 0x8b9be0, n: 4 },
+  c: { color: 0x7e8bd8, n: 5 },
+};
+
 {
   const text = document.getElementById('objdata').textContent;
   const obj = new OBJLoader().parse(text);
+  let srcGeom = null;
+  obj.traverse((n) => { if (n.isMesh && !srcGeom) srcGeom = n.geometry; });
+  srcGeom.center();
+  const srcPos = srcGeom.attributes.position;
 
-  const bodyMat = new THREE.MeshPhysicalMaterial({
-    color: 0x7e8bd8,
-    transparent: true,
-    opacity: 0.9,
-    roughness: 0.32,
-    metalness: 0.05,
-    clearcoat: 0.6,
-    clearcoatRoughness: 0.35,
-    emissive: 0x353a75,
-    emissiveIntensity: 0.18,
+  /* segment into connected components, pick the three squares by front-face area */
+  const comps = splitComponents(srcGeom).map((tris) => ({ tris, ...compStats(srcPos, tris) }));
+  comps.sort((p, q) => q.frontArea - p.frontArea);
+  let squares = comps.slice(0, 3);
+  let rest = comps.slice(3);
+  if (comps.length < 3) { squares = comps; rest = []; }
+
+  /* smallest front area = a (3), then b (4), largest = c (5) */
+  squares.sort((p, q) => p.frontArea - q.frontArea);
+  const keys = ['a', 'b', 'c'].slice(0, squares.length);
+
+  keys.forEach((keyName, idx) => {
+    const compData = squares[idx];
+    const style = PART_STYLE[keyName];
+    const g = geomFromTris(srcPos, compData.tris);
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: style.color,
+      transparent: true,
+      opacity: 0.9,
+      roughness: 0.32,
+      metalness: 0.05,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.35,
+      emissive: new THREE.Color(style.color).multiplyScalar(0.5),
+      emissiveIntensity: 0.3,
+    });
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.userData.part = keyName;
+    mesh.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(g, 28),
+      new THREE.LineBasicMaterial({ color: 0xfff4dd, transparent: true, opacity: 0.4 })
+    ));
+    const group = new THREE.Group();
+    group.add(mesh);
+
+    /* fitted front rectangle -> counting tile grid */
+    const frontPts = [];
+    for (let i = 0; i < srcPos.count; i += 2) {
+      /* skip: filled below from component verts only */
+    }
+    for (const t of compData.tris) {
+      for (let k = 0; k < 3; k++) {
+        const i = t * 3 + k;
+        if (srcPos.getZ(i) > compData.bb.maxZ - 0.03) frontPts.push({ x: srcPos.getX(i), y: srcPos.getY(i) });
+      }
+    }
+    let rect = null;
+    if (frontPts.length > 8) rect = minAreaRect(frontPts);
+    let tiles = null;
+    if (rect) {
+      const n = style.n;
+      const cw = rect.width / n, ch = rect.height / n;
+      const tileGeom = new THREE.BoxGeometry(cw * 0.84, ch * 0.84, 0.02);
+      const tileMat = new THREE.MeshBasicMaterial({ color: 0xffedc4, transparent: true, opacity: 0.95 });
+      const im = new THREE.InstancedMesh(tileGeom, tileMat, n * n);
+      im.renderOrder = 10;
+      const mtx = new THREE.Matrix4();
+      const positions = [];
+      const cos = Math.cos(rect.angle), sin = Math.sin(rect.angle);
+      for (let r = 0; r < n; r++) {
+        for (let col = 0; col < n; col++) {
+          const lx = -rect.width / 2 + (col + 0.5) * cw;
+          const ly = rect.height / 2 - (r + 0.5) * ch;
+          positions.push(new THREE.Vector3(
+            rect.center.x + lx * cos - ly * sin,
+            rect.center.y + lx * sin + ly * cos,
+            compData.bb.maxZ + 0.018
+          ));
+        }
+      }
+      positions.forEach((p, i) => { mtx.compose(p, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), rect.angle), new THREE.Vector3(0, 0, 0)); im.setMatrixAt(i, mtx); });
+      im.instanceMatrix.needsUpdate = true;
+      im.userData = { positions, angle: rect.angle };
+      group.add(im);
+      tiles = im;
+    }
+
+    /* floating value label */
+    const label = makeLabel();
+    label.sprite.position.set(compData.centroid.x, compData.centroid.y, compData.bb.maxZ + 0.3);
+    group.add(label.sprite);
+
+    model.add(group);
+    raycastTargets.push(mesh);
+    parts[keyName] = {
+      key: keyName, group, mesh, mat, label, tiles, n: style.n,
+      dir: new THREE.Vector3(compData.centroid.x, compData.centroid.y, 0).normalize(),
+      baseEmissive: 0.3,
+    };
   });
 
-  obj.traverse((n) => {
-    if (!n.isMesh) return;
-    n.geometry.computeVertexNormals();
-    n.material = bodyMat;
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(n.geometry, 28),
-      new THREE.LineBasicMaterial({ color: 0xfff4dd, transparent: true, opacity: 0.35 })
-    );
-    n.add(edges);
-  });
+  /* everything else (triangle frame, small details) glows warm */
+  if (rest.length) {
+    const allTris = rest.flatMap((r) => r.tris);
+    const g = geomFromTris(srcPos, allTris);
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: 0xfff0d8, transparent: true, opacity: 0.95,
+      roughness: 0.3, metalness: 0.02,
+      emissive: 0xffc98a, emissiveIntensity: 0.65,
+    });
+    const mesh = new THREE.Mesh(g, mat);
+    frameGroup = new THREE.Group();
+    frameGroup.add(mesh);
+    model.add(frameGroup);
+  }
 
-  const box = new THREE.Box3().setFromObject(obj);
-  const c = box.getCenter(new THREE.Vector3());
-  obj.position.sub(c);
+  const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const s = 2.05 / Math.max(size.x, size.y, size.z);
   model.scale.setScalar(s);
-  model.add(obj);
   model.position.y = 0.02;
 
   document.getElementById('loader').classList.add('hide');
 }
-
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
-
-const clock = new THREE.Clock();
-renderer.setAnimationLoop(() => {
-  const t = clock.getElapsedTime();
-  glowGroup.children.forEach((p, i) => (p.intensity = 1.6 + Math.sin(t * 2.1 + i * 1.7) * 0.5));
-  model.position.y = 0.02 + Math.sin(t * 0.8) * 0.022;
-  controls.update();
-  renderer.render(scene, camera);
-});
 
 /* ---------------- shared helpers ---------------- */
 const $ = (id) => document.getElementById(id);
@@ -116,6 +343,156 @@ function el(tag, cls, html) {
   if (html !== undefined) e.innerHTML = html;
   return e;
 }
+
+/* ---------------- 3D labels: values or letters ---------------- */
+let labelMode = 'values';
+function refreshLabels() {
+  for (const k of Object.keys(parts)) {
+    const p = parts[k];
+    p.label.set(labelMode === 'values' ? `${k}² = ${p.n * p.n}` : k);
+  }
+}
+refreshLabels();
+
+/* ---------------- counting animation ---------------- */
+let countState = null; // { part, i, timer, endTimer }
+function hideTiles(part) {
+  if (!part.tiles) return;
+  const im = part.tiles, mtx = new THREE.Matrix4();
+  im.userData.positions.forEach((p, i) => {
+    mtx.compose(p, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), im.userData.angle), new THREE.Vector3(0, 0, 0));
+    im.setMatrixAt(i, mtx);
+  });
+  im.instanceMatrix.needsUpdate = true;
+}
+function stopCount() {
+  if (!countState) return;
+  clearInterval(countState.timer);
+  clearTimeout(countState.endTimer);
+  hideTiles(countState.part);
+  refreshLabels();
+  countState = null;
+}
+function startCount(part, onDone) {
+  stopCount();
+  if (!part.tiles) return;
+  const im = part.tiles;
+  const total = part.n * part.n;
+  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), im.userData.angle);
+  const mtx = new THREE.Matrix4();
+  const per = part.n === 5 ? 85 : part.n === 4 ? 115 : 150;
+  let i = 0;
+  part.label.set('0');
+  countState = { part, timer: null, endTimer: null };
+  countState.timer = setInterval(() => {
+    mtx.compose(im.userData.positions[i], q, new THREE.Vector3(1, 1, 1));
+    im.setMatrixAt(i, mtx);
+    im.instanceMatrix.needsUpdate = true;
+    i++;
+    part.label.set(String(i));
+    if (chipCountFollows) chipT2.textContent = `${i} of ${total} unit squares`;
+    if (i >= total) {
+      clearInterval(countState.timer);
+      part.label.set(`${part.key}² = ${total}`);
+      countState.endTimer = setTimeout(() => {
+        hideTiles(part);
+        refreshLabels();
+        countState = null;
+        if (onDone) onDone();
+      }, 1500);
+    }
+  }, per);
+}
+let chipCountFollows = false;
+function countWithChip(part) {
+  chipCountFollows = true;
+  const total = part.n * part.n;
+  chipT1.textContent = `Counting ${part.key}² — side ${part.n}`;
+  chipT2.textContent = `0 of ${total} unit squares`;
+  pulseRow(part.key, true);
+  startCount(part, () => {
+    chipCountFollows = false;
+    chipT1.textContent = `${part.key}² = ${part.n} × ${part.n} = ${total}`;
+    chipT2.textContent = total === 25 ? '9 + 16 = 25 — the theorem in cubes!' : 'Every side carries its own square';
+    pulseRow(part.key, false);
+    if (mode === 'explore') setTimeout(() => { if (mode === 'explore' && !countState) setExploreChip(); }, 2600);
+  });
+}
+function pulseRow(k, on) {
+  const row = { a: $('rowA'), b: $('rowB'), c: $('rowC') }[k];
+  if (!row) return;
+  if (on) row.classList.add('pulse'); else row.classList.remove('pulse');
+}
+
+/* ---------------- hover + click picking ---------------- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hoverPart = null;
+let downPos = null;
+
+function pickPart(e) {
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects(raycastTargets, false)[0];
+  return hit ? parts[hit.object.userData.part] : null;
+}
+renderer.domElement.addEventListener('pointermove', (e) => {
+  const p = pickPart(e);
+  if (p !== hoverPart) {
+    hoverPart = p;
+    renderer.domElement.style.cursor = p ? 'pointer' : '';
+  }
+});
+renderer.domElement.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  if (moved > 6) return;
+  const p = pickPart(e);
+  if (p) countWithChip(p);
+});
+
+/* ---------------- view tools ---------------- */
+let exploded = false, explodeF = 0;
+$('btnExplode').addEventListener('click', () => {
+  exploded = !exploded;
+  $('btnExplode').classList.toggle('on', exploded);
+});
+$('btnLabels').addEventListener('click', () => {
+  const on = $('btnLabels').classList.toggle('on');
+  for (const k of Object.keys(parts)) parts[k].label.sprite.visible = on;
+});
+
+/* ---------------- render loop ---------------- */
+let highlightKey = null;
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const t = clock.getElapsedTime();
+  glowGroup.children.forEach((p, i) => (p.intensity = 1.6 + Math.sin(t * 2.1 + i * 1.7) * 0.5));
+  model.position.y = 0.02 + Math.sin(t * 0.8) * 0.022;
+
+  explodeF += ((exploded ? 1 : 0) - explodeF) * 0.07;
+  for (const k of Object.keys(parts)) {
+    const p = parts[k];
+    p.group.position.copy(p.dir).multiplyScalar(0.34 * explodeF);
+    let target = p.baseEmissive;
+    if (hoverPart === p) target += 0.25;
+    if (highlightKey === k) target += 0.3 + Math.sin(t * 5) * 0.15;
+    if (countState && countState.part === p) target += 0.35;
+    p.mat.emissiveIntensity += (target - p.mat.emissiveIntensity) * 0.15;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
 
 /* ---------------- progress (persisted) ---------------- */
 const DEFAULT_PROGRESS = { xp: 22, level: 10, done: {}, correct: 0, streakBest: 0 };
@@ -171,13 +548,13 @@ function renderTriangle() {
   $('sumNote').textContent = isPerfect()
     ? `perfect triple — c = ${c} exactly`
     : `c = √${a * a + b * b} ≈ ${c.toFixed(2)}`;
-  if (mode === 'explore') setExploreChip();
+  if (mode === 'explore' && !countState) setExploreChip();
 }
 function setExploreChip() {
   const c = hyp();
   if (isPerfect()) {
     chipT1.textContent = `${tri.a}:${tri.b}:${c} Triangle`;
-    chipT2.innerHTML = 'a&sup2; + b&sup2; = c&sup2;';
+    chipT2.textContent = 'Tap a square on the model to count its cells';
   } else {
     chipT1.textContent = `Right Triangle  a=${tri.a}, b=${tri.b}`;
     chipT2.textContent = `c = √${tri.a * tri.a + tri.b * tri.b} ≈ ${c.toFixed(2)}`;
@@ -469,10 +846,14 @@ function showPracticeStep() {
   rows[s.row].classList.add('pulse');
   chipT1.textContent = s.t1;
   chipT2.textContent = s.t2;
+  highlightKey = s.row;
+  if (parts[s.row]) startCount(parts[s.row]);
 }
 function clearPractice() {
   clearInterval(practiceTimer);
   practiceTimer = null;
+  highlightKey = null;
+  stopCount();
   Object.values(rows).forEach((r) => r.classList.remove('pulse'));
 }
 
@@ -561,8 +942,12 @@ function setMode(m) {
   mode = m;
   document.querySelectorAll('.mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
   clearPractice();
+  stopCount();
+  chipCountFollows = false;
   chip.classList.remove('quiz');
   controls.autoRotate = m === 'explore';
+  labelMode = m === 'test' ? 'letters' : 'values';
+  refreshLabels();
 
   if (m === 'explore') setExploreChip();
   if (m === 'practice') {
@@ -572,7 +957,7 @@ function setMode(m) {
       practiceIdx++;
       if (practiceIdx % 3 === 0) addXP(4);
       showPracticeStep();
-    }, 2600);
+    }, 3300);
   }
   if (m === 'test') askQuiz();
 }
