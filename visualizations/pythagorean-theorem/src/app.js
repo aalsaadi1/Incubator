@@ -198,6 +198,7 @@ scene.add(model);
 const parts = {};           // a | b | c -> part record
 let frameGroup = null;
 const raycastTargets = [];
+const sideLetters = [];
 
 const PART_N = { a: 3, b: 4, c: 5 };
 
@@ -210,19 +211,188 @@ const PART_N = { a: 3, b: 4, c: 5 };
     return new Float32Array(bytes.buffer);
   };
 
-  /* textures (baked colors + engraved detail) */
-  const mkTex = (dataURL, srgb) => {
+  /* textures (baked colors + engraved detail), scrubbed of the baked-in
+     side letters: within the UV area of front-facing triangles, dark marks
+     sitting on a bright ground are the letters — inpaint them from their
+     surroundings in BOTH maps. Crisp letter sprites replace them in 3D. */
+  const TS = 1024;
+  let cleanMaskTris = null; // filled after segmentation, before images decode
+  const texJobs = { diff: null, norm: null, pending: 0 };
+
+  function buildMask() {
+    const mcv = document.createElement('canvas');
+    mcv.width = mcv.height = TS;
+    const mctx = mcv.getContext('2d');
+    mctx.fillStyle = '#000';
+    mctx.fillRect(0, 0, TS, TS);
+    mctx.fillStyle = '#fff';
+    mctx.beginPath();
+    for (const t of cleanMaskTris) {
+      mctx.moveTo(t[0] * TS, (1 - t[1]) * TS);
+      mctx.lineTo(t[2] * TS, (1 - t[3]) * TS);
+      mctx.lineTo(t[4] * TS, (1 - t[5]) * TS);
+      mctx.closePath();
+    }
+    mctx.fill();
+    const m = mctx.getImageData(0, 0, TS, TS).data;
+    const mask = new Uint8Array(TS * TS);
+    for (let i = 0; i < TS * TS; i++) mask[i] = m[i * 4] > 128 ? 1 : 0;
+    /* erode 3px so island-edge bevels are untouched */
+    const eroded = new Uint8Array(TS * TS);
+    for (let y = 3; y < TS - 3; y++) for (let x = 3; x < TS - 3; x++) {
+      if (!mask[y * TS + x]) continue;
+      let ok = true;
+      for (let dy = -3; dy <= 3 && ok; dy++) for (let dx = -3; dx <= 3 && dx <= 3 && ok; dx++) if (!mask[(y + dy) * TS + x + dx]) ok = false;
+      if (ok) eroded[y * TS + x] = 1;
+    }
+    return eroded;
+  }
+
+  function detectLetters(d, eroded) {
+    const lum = new Float32Array(TS * TS);
+    for (let i = 0; i < TS * TS; i++) lum[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    const bad = new Uint8Array(TS * TS);
+    const seeds = [];
+    const R = 9, SAMPLES = 16;
+    for (let y = R; y < TS - R; y++) for (let x = R; x < TS - R; x++) {
+      const i = y * TS + x;
+      if (!eroded[i] || lum[i] >= 128) continue;
+      let ring = 0;
+      for (let s = 0; s < SAMPLES; s++) {
+        const ang = (s / SAMPLES) * Math.PI * 2;
+        ring += lum[((y + Math.round(Math.sin(ang) * R)) * TS) + x + Math.round(Math.cos(ang) * R)];
+      }
+      if (ring / SAMPLES > 150) { bad[i] = 1; seeds.push(i); }
+    }
+    /* flood into connected dark pixels (thick letter interiors) */
+    let frontier = seeds.slice();
+    while (frontier.length) {
+      const next = [];
+      for (const i of frontier) {
+        const x = i % TS, y = (i / TS) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const j = (y + dy) * TS + x + dx;
+          if (eroded[j] && !bad[j] && lum[j] < 148) { bad[j] = 1; next.push(j); seeds.push(j); }
+        }
+      }
+      frontier = next;
+    }
+    /* dilate 2px */
+    let list = seeds;
+    for (let pass = 0; pass < 3; pass++) {
+      const grown = [];
+      for (const i of list) {
+        const x = i % TS, y = (i / TS) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const j = (y + dy) * TS + x + dx;
+          if (eroded[j] && !bad[j]) { bad[j] = 1; grown.push(j); }
+        }
+      }
+      list = list.concat(grown);
+    }
+    return { bad, list };
+  }
+
+  function inpaint(d, badIn, listIn) {
+    const bad = badIn.slice();
+    let remaining = listIn.slice();
+    for (let iter = 0; iter < 120 && remaining.length; iter++) {
+      const next = [], filled = [];
+      for (const i of remaining) {
+        const x = i % TS, y = (i / TS) | 0;
+        let r = 0, g = 0, b = 0, n = 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= TS || yy >= TS) continue;
+          const j = yy * TS + xx;
+          if (bad[j]) continue;
+          r += d[j * 4]; g += d[j * 4 + 1]; b += d[j * 4 + 2]; n++;
+        }
+        if (n >= 2) { d[i * 4] = r / n; d[i * 4 + 1] = g / n; d[i * 4 + 2] = b / n; filled.push(i); }
+        else next.push(i);
+      }
+      if (!filled.length) break;
+      for (const i of filled) bad[i] = 0;
+      remaining = next;
+    }
+  }
+
+  function finishTextures() {
+    if (texJobs.pending > 0 || !texJobs.diff || !cleanMaskTris) return;
+    const eroded = buildMask();
+    const dImg = texJobs.diff.ctx.getImageData(0, 0, TS, TS);
+    const { bad, list } = detectLetters(dImg.data, eroded);
+    /* baked-in sculpting-tool marks the thresholds miss — scrub these spots outright (uv + radius px) */
+    for (const [u, v, r] of [[0.141, 0.187, 13]]) {
+      const cx = Math.round(u * TS), cy = Math.round((1 - v) * TS);
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue;
+        const x = cx + dx, y = cy + dy;
+        if (x < 0 || y < 0 || x >= TS || y >= TS) continue;
+        const i = y * TS + x;
+        if (!bad[i]) { bad[i] = 1; list.push(i); }
+      }
+    }
+    inpaint(dImg.data, bad, list);
+    texJobs.diff.ctx.putImageData(dImg, 0, 0);
+    texJobs.diff.tex.needsUpdate = true;
+    if (texJobs.norm) {
+      /* the letters are engraved in the normal map slightly wider than their
+         color marks — flatten any bump deviation NEAR the detected letters,
+         without touching the grid engraving elsewhere */
+      const region = new Uint8Array(TS * TS);
+      let frontier = list.slice();
+      for (const i of list) region[i] = 1;
+      for (let pass = 0; pass < 10; pass++) {
+        const next = [];
+        for (const i of frontier) {
+          const x = i % TS, y = (i / TS) | 0;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const xx = x + dx, yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= TS || yy >= TS) continue;
+            const j = yy * TS + xx;
+            if (!region[j] && eroded[j]) { region[j] = 1; next.push(j); }
+          }
+        }
+        frontier = next;
+      }
+      const nImg = texJobs.norm.ctx.getImageData(0, 0, TS, TS);
+      const nd = nImg.data;
+      const badN = bad.slice();
+      const listN = list.slice();
+      for (let i = 0; i < TS * TS; i++) {
+        if (!region[i] || badN[i]) continue;
+        if (Math.abs(nd[i * 4] - 128) > 22 || Math.abs(nd[i * 4 + 1] - 128) > 22) { badN[i] = 1; listN.push(i); }
+      }
+      inpaint(nd, badN, listN);
+      texJobs.norm.ctx.putImageData(nImg, 0, 0);
+      texJobs.norm.tex.needsUpdate = true;
+    }
+  }
+
+  const mkTex = (dataURL, srgb, slot) => {
     if (!dataURL) return null;
-    const img = new Image();
-    const tex = new THREE.Texture(img);
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = TS;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    const tex = new THREE.CanvasTexture(cv);
     if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
-    img.onload = () => { tex.needsUpdate = true; document.getElementById('loader').classList.add('hide'); };
+    texJobs.pending++;
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, TS, TS);
+      tex.needsUpdate = true;
+      texJobs[slot] = { ctx, tex };
+      texJobs.pending--;
+      document.getElementById('loader').classList.add('hide');
+      finishTextures();
+    };
     img.src = dataURL;
     return tex;
   };
-  const diffTex = mkTex(data.diffuse, true);
-  const normTex = mkTex(data.normal, false);
+  const diffTex = mkTex(data.diffuse, true, 'diff');
+  const normTex = mkTex(data.normal, false, 'norm');
 
   /* geometry: decode, then normalize to the same local span the layout constants assume */
   const mesh0 = data.meshes[0];
@@ -252,6 +422,27 @@ const PART_N = { a: 3, b: 4, c: 5 };
 
   /* segment into connected components; the three biggest front faces are the squares */
   const comps = splitComponents(srcGeom).map((tris) => ({ tris, ...compStats(srcPos, tris) }));
+
+  /* front-facing UV triangles of the whole model -> letter-cleaning mask */
+  if (srcGeom.attributes.uv) {
+    const uv = srcGeom.attributes.uv.array;
+    const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
+    const ab = new THREE.Vector3(), ac = new THREE.Vector3(), cr = new THREE.Vector3();
+    cleanMaskTris = [];
+    const triCount = srcPos.count / 3;
+    for (let t = 0; t < triCount; t++) {
+      va.fromBufferAttribute(srcPos, t * 3); vb.fromBufferAttribute(srcPos, t * 3 + 1); vc.fromBufferAttribute(srcPos, t * 3 + 2);
+      ab.subVectors(vb, va); ac.subVectors(vc, va); cr.crossVectors(ab, ac);
+      const len = cr.length();
+      const front = len > 0 && cr.z / len > 0.3 && (va.z + vb.z + vc.z) / 3 > 0;
+      const top = len > 0 && cr.y / len > 0.35;
+      if (front || top) {
+        const i0 = t * 3, i1 = t * 3 + 1, i2 = t * 3 + 2;
+        cleanMaskTris.push([uv[i0 * 2], uv[i0 * 2 + 1], uv[i1 * 2], uv[i1 * 2 + 1], uv[i2 * 2], uv[i2 * 2 + 1]]);
+      }
+    }
+    finishTextures();
+  }
   comps.sort((p, q) => q.frontArea - p.frontArea);
   const squares = comps.slice(0, Math.min(3, comps.length));
   const rest = comps.slice(squares.length);
@@ -322,12 +513,13 @@ const PART_N = { a: 3, b: 4, c: 5 };
     raycastTargets.push(mesh);
     parts[keyName] = {
       key: keyName, group, mesh, mat, label, tiles, n: PART_N[keyName],
+      rect, center2d: rect ? rect.center : compData.centroid,
       dir: new THREE.Vector3(compData.centroid.x, compData.centroid.y, 0).normalize(),
       baseEmissive: 0.12,
     };
   });
 
-  /* everything else: the cream triangle frame with the engraved side letters */
+  /* everything else: the cream triangle frame (its baked letters get scrubbed) */
   if (rest.length) {
     const allTris = rest.flatMap((r) => r.tris);
     const g = geomFromTris(srcGeom, allTris);
@@ -336,6 +528,37 @@ const PART_N = { a: 3, b: 4, c: 5 };
     frameGroup = new THREE.Group();
     frameGroup.add(mesh);
     model.add(frameGroup);
+
+    /* crisp side letters on the bars, matching the app's typography */
+    const frameStats = compStats(srcPos, allTris);
+    const frontZ = frameStats.bb.maxZ;
+    const T = frameStats.centroid;
+    for (const k of Object.keys(parts)) {
+      const p = parts[k];
+      if (!p.rect) continue;
+      const S = p.center2d;
+      const dir = new THREE.Vector2(T.x - S.x, T.y - S.y).normalize();
+      const half = Math.min(p.rect.width, p.rect.height) / 2;
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 200;
+      const ctx = cv.getContext('2d');
+      ctx.font = 'italic 700 128px Georgia, "Times New Roman", serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(251,249,244,.95)';
+      ctx.lineWidth = 26;
+      ctx.strokeText(k, 100, 108);
+      ctx.fillStyle = '#6b5468';
+      ctx.fillText(k, 100, 108);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = 4;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+      sprite.scale.set(0.15, 0.15, 1);
+      sprite.position.set(S.x + dir.x * (half + 0.01), S.y + dir.y * (half + 0.01), frontZ + 0.045);
+      /* the a/b bars are welded to their squares (they travel on explode); c's bar stays with the frame */
+      (k === 'c' ? frameGroup : p.group).add(sprite);
+      sideLetters.push(sprite);
+    }
   }
 
   model.position.y = 0.02;
@@ -479,6 +702,7 @@ $('btnExplode').addEventListener('click', () => {
 $('btnLabels').addEventListener('click', () => {
   const on = $('btnLabels').classList.toggle('on');
   for (const k of Object.keys(parts)) parts[k].label.sprite.visible = on;
+  for (const s of sideLetters) s.visible = on;
 });
 
 /* ---------------- render loop ---------------- */
