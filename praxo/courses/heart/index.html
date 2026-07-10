@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEMO — Explore the Circulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --rose:#e11d48; --rose-dark:#be123c; --rose-soft:#ffe4e6;
+    --blue:#3b82f6; --violet:#8b5cf6;
+    --ink:#1e293b; --ink-2:#334155; --slate:#64748b; --faint:#94a3b8; --ghost:#cbd5e1;
+    --line:#f1f5f9;
+    --shadow:0 1px 3px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:'Archivo','Segoe UI',system-ui,sans-serif;
+    background:linear-gradient(160deg,#f7f4ee 0%,#f3eee7 60%,#efe8f0 100%);
+    color:var(--ink);
+  }
+  svg{display:block}
+  button{font-family:inherit;border:none;background:none;cursor:pointer;color:inherit}
+
+  .app{display:flex;flex-direction:column;gap:16px;min-height:100vh;padding:16px}
+  @media(min-width:1024px){.app{flex-direction:row;height:100vh;overflow:hidden}}
+
+  .card{background:#fff;border-radius:24px;box-shadow:var(--shadow);border:1px solid rgba(0,0,0,.05)}
+
+  /* ---------- left column ---------- */
+  .left{display:flex;flex-direction:column;gap:16px;width:100%}
+  @media(min-width:1024px){.left{width:290px;flex:none}}
+  .brand{padding:20px;display:flex;align-items:center;gap:12px}
+  .brand .mk{width:44px;height:44px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#fff;
+    background:linear-gradient(140deg,#f43f5e,#be123c);box-shadow:inset 0 -6px 10px rgba(0,0,0,.18)}
+  .brand .mk svg{width:24px;height:24px;fill:currentColor}
+  .brand h1{font-size:21px;font-weight:900;letter-spacing:-.01em;color:var(--rose)}
+  .brand p{font-size:9.5px;font-weight:700;letter-spacing:.18em;color:var(--faint);text-transform:uppercase;margin-top:1px}
+  .backlink{display:inline-flex;align-items:center;gap:6px;margin:0 20px 14px;margin-top:-6px;font-size:11px;font-weight:700;
+    color:var(--slate);text-decoration:none;border-radius:10px;padding:5px 9px;background:#f8fafc;transition:.2s;width:fit-content}
+  .backlink:hover{background:#f1f5f9;color:var(--ink)}
+  .backlink svg{width:12px;height:12px}
+
+  .journey{display:flex;flex-direction:column;min-height:0;flex:1;padding:12px}
+  .journey .hd{display:flex;justify-content:space-between;padding:8px 8px 10px}
+  .journey .hd b{font-size:11px;font-weight:800;letter-spacing:.15em;color:var(--faint);text-transform:uppercase}
+  .journey .hd span{font-size:11px;font-weight:600;color:var(--ghost)}
+  .stops{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;max-height:340px}
+  @media(min-width:1024px){.stops{max-height:none}}
+  .stop{display:flex;align-items:center;gap:12px;border:1px solid transparent;border-radius:16px;padding:10px 12px;text-align:left;transition:.15s}
+  .stop:hover{background:#f8fafc}
+  .stop.active{border-color:#fecdd3;background:rgba(255,228,230,.55);box-shadow:var(--shadow)}
+  .stop .ico{position:relative;width:36px;height:36px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff}
+  .stop .ico svg{width:16px;height:16px}
+  .stop .num{position:absolute;top:-4px;left:-4px;width:16px;height:16px;border-radius:99px;background:#fff;color:var(--slate);
+    font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+  .stop .tx{flex:1;min-width:0}
+  .stop .tx b{display:block;font-size:13px;font-weight:800;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stop .tx span{display:block;font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stop .here{border-radius:6px;background:var(--rose);color:#fff;font-size:9px;font-weight:800;letter-spacing:.06em;padding:2px 6px}
+  .stop .done{color:#10b981}.stop .done svg{width:16px;height:16px}
+
+  .lprog{padding:16px}
+  .lprog .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .lprog .hd b{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--faint);text-transform:uppercase}
+  .lprog .hd b svg{width:16px;height:16px}
+  .lprog .hd span{font-size:14px;font-weight:800;color:var(--rose)}
+  .meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+  .meter i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#fb7185,var(--rose));transition:width .4s}
+
+  /* ---------- center ---------- */
+  .center{display:flex;flex-direction:column;min-height:0;flex:1;min-width:0}
+  .main-card{position:relative;display:flex;flex-direction:column;min-height:520px;flex:1;border-radius:24px;
+    background:rgba(255,255,255,.6);backdrop-filter:blur(8px);box-shadow:var(--shadow);border:1px solid rgba(0,0,0,.05);overflow:hidden}
+  .head{padding:24px 24px 0}
+  @media(min-width:768px){.head{padding:32px 40px 0}}
+  .head .ttl{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+  .head h2{font-size:30px;font-weight:900;letter-spacing:-.02em;color:var(--ink)}
+  @media(min-width:768px){.head h2{font-size:36px}}
+  .oxy-pill{display:flex;align-items:center;gap:6px;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:800}
+  .oxy-pill svg{width:13px;height:13px;fill:currentColor}
+  .head .nick{margin-top:4px;font-size:13px;font-weight:700;letter-spacing:.15em;color:var(--faint);text-transform:uppercase}
+  .head .desc{margin-top:12px;max-width:620px;font-size:15px;line-height:1.6;color:var(--slate)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .chip{display:flex;align-items:center;gap:6px;border-radius:99px;background:#fff;padding:6px 12px;font-size:12px;font-weight:600;
+    color:var(--slate);box-shadow:var(--shadow)}
+  .chip svg{width:13px;height:13px;color:var(--faint)}
+
+  #viewer{position:relative;flex:1;min-height:300px}
+  #viewer canvas{display:block}
+  .rot-btn{position:absolute;right:16px;top:16px;width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.9);color:var(--slate);box-shadow:var(--shadow);transition:.2s}
+  .rot-btn.on{background:var(--rose);color:#fff}
+  .rot-btn svg{width:16px;height:16px}
+  .play-btn{position:absolute;left:16px;top:16px;display:none;align-items:center;gap:8px;border-radius:14px;background:var(--rose);
+    padding:9px 16px;font-size:13px;font-weight:700;color:#fff;box-shadow:0 6px 16px rgba(225,29,72,.3);transition:.2s}
+  .play-btn:hover{background:var(--rose-dark)}
+  .play-btn svg{width:15px;height:15px;fill:currentColor}
+  .stage-pill{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:16px;
+    background:rgba(255,255,255,.92);border-radius:16px;padding:9px 18px;box-shadow:0 8px 20px rgba(15,23,42,.1);backdrop-filter:blur(6px)}
+  .stage-pill button{padding:4px;border-radius:8px;color:var(--faint);transition:.15s}
+  .stage-pill button:hover{background:var(--line);color:var(--ink-2)}
+  .stage-pill button svg{width:16px;height:16px}
+  .stage-pill .mid{text-align:center;min-width:130px}
+  .stage-pill .mid small{display:block;font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--faint);text-transform:uppercase}
+  .stage-pill .mid b{display:block;font-size:13px;font-weight:800;color:var(--ink-2)}
+
+  .dots{display:flex;justify-content:center;gap:6px;padding:0 0 12px}
+  .dots button{height:6px;width:8px;border-radius:99px;background:var(--ghost);transition:all .25s}
+  .dots button.on{width:22px}
+
+  .modes{display:flex;justify-content:center;margin-top:16px}
+  .modes .box{display:flex;gap:4px;background:#fff;border-radius:18px;padding:6px;box-shadow:var(--shadow)}
+  .mode{display:flex;align-items:center;gap:8px;border-radius:13px;padding:10px 20px;font-size:14px;font-weight:800;color:var(--slate);transition:.15s}
+  .mode:hover{background:#f8fafc;color:var(--ink)}
+  .mode.on{background:var(--rose);color:#fff;box-shadow:var(--shadow)}
+  .mode svg{width:16px;height:16px}
+
+  /* ---------- right column ---------- */
+  .right{display:flex;flex-direction:column;gap:16px;width:100%}
+  @media(min-width:1024px){.right{width:330px;flex:none;overflow-y:auto}}
+  .profile{padding:16px}
+  .profile .row{display:flex;align-items:center;gap:12px}
+  .profile .pic{width:48px;height:48px;border-radius:16px;background:linear-gradient(140deg,#334155,#0f172a);color:#fff;
+    display:flex;align-items:center;justify-content:center}
+  .profile .pic svg{width:22px;height:22px}
+  .profile .who{flex:1;min-width:0}
+  .profile .who b{display:block;font-size:14px;font-weight:900;color:var(--ink)}
+  .profile .who span{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--faint);text-transform:uppercase}
+  .profile .bell{padding:8px;border-radius:12px;color:var(--ghost)}
+  .profile .bell svg{width:19px;height:19px}
+  .profile .meter{margin-top:12px}
+  .profile .meter i{background:linear-gradient(90deg,#fbbf24,#f43f5e)}
+  .profile .xph{margin-top:6px;text-align:right;font-size:10px;font-weight:600;color:var(--faint)}
+
+  .ov{padding:20px}
+  .ov .hd{display:flex;justify-content:space-between;align-items:center}
+  .ov .hd b{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
+  .ov .hd i{width:8px;height:8px;border-radius:99px}
+  .ovrows{margin-top:8px}
+  .ovrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .ovrow:last-child{border-bottom:none}
+  .ovrow .ic{width:32px;height:32px;flex:none;border-radius:10px;background:#f8fafc;color:var(--faint);display:flex;align-items:center;justify-content:center}
+  .ovrow .ic svg{width:15px;height:15px}
+  .ovrow .m{flex:1;min-width:0}
+  .ovrow .m small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--faint);text-transform:uppercase}
+  .ovrow .m .mini{margin-top:5px;height:5px;border-radius:99px;background:var(--line);overflow:hidden}
+  .ovrow .m .mini i{display:block;height:100%;border-radius:99px;transition:width .4s}
+  .ovrow > b{font-size:13.5px;font-weight:800;color:var(--ink-2);text-align:right;flex:none}
+
+  .fns{padding:20px}
+  .fns > b{display:block;font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-bottom:12px}
+  .fn{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px;transition:.15s}
+  .fn:last-child{margin-bottom:0}
+  .fn:hover{border-color:#fecdd3;background:rgba(255,228,230,.3)}
+  .fn .ic{width:36px;height:36px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center}
+  .fn .ic svg{width:16px;height:16px}
+  .fn .m{flex:1;min-width:0}
+  .fn .m b{display:block;font-size:13px;font-weight:800;color:var(--ink-2)}
+  .fn .m span{display:block;font-size:12px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fn > svg{width:16px;height:16px;color:var(--ghost);flex:none}
+
+  .legend{padding:20px}
+  .legend > b{display:block;font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
+  .lg{display:flex;align-items:center;gap:12px;margin-top:12px}
+  .lg i{width:16px;height:16px;border-radius:99px}
+  .lg span{font-size:14px;font-weight:500;color:var(--ink-2)}
+  .tipbox{margin-top:20px;border-radius:16px;background:var(--rose-soft);padding:16px}
+  .tipbox b{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:#be123c}
+  .tipbox b svg{width:16px;height:16px}
+  .tipbox p{margin-top:4px;font-size:13px;line-height:1.5;color:rgba(190,18,60,.8)}
+
+  .toast{border-radius:16px;background:#1e293b;color:#fff;padding:16px;box-shadow:var(--shadow)}
+  .toast p{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+  .toast svg{width:16px;height:16px;color:#fcd34d;flex:none}
+
+  /* ---------- quiz ---------- */
+  .quiz{display:flex;flex-direction:column;flex:1;padding:24px}
+  @media(min-width:768px){.quiz{padding:24px 40px}}
+  .quiz .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .quiz .top b{font-size:12px;font-weight:700;letter-spacing:.2em;color:#f43f5e;text-transform:uppercase}
+  .quiz .top span{font-size:13px;font-weight:500;color:var(--faint)}
+  .quiz .pbar{height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-bottom:24px}
+  .quiz .pbar i{display:block;height:100%;border-radius:99px;background:#f43f5e;transition:width .3s}
+  .quiz h2{font-size:24px;font-weight:800;line-height:1.35;color:var(--ink);margin-bottom:24px}
+  @media(min-width:768px){.quiz h2{font-size:28px}}
+  .opts{display:grid;gap:12px}
+  .opt{display:flex;align-items:center;justify-content:space-between;border:2px solid #e2e8f0;border-radius:18px;background:#fff;
+    padding:16px 20px;text-align:left;font-size:16px;font-weight:500;color:var(--ink-2);transition:.15s}
+  .opt:not(:disabled):hover{border-color:#fda4af;background:rgba(255,228,230,.4)}
+  .opt.correct{border-color:#34d399;background:#ecfdf5;color:#065f46}
+  .opt.wrong{border-color:#fda4af;background:#fff1f2;color:#be123c}
+  .opt.dim{color:var(--faint)}
+  .opt svg{width:20px;height:20px;flex:none}
+  .quiz .foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:24px}
+  .quiz .foot span{font-size:13px;color:var(--faint)}
+  .nextbtn{display:flex;align-items:center;gap:8px;border-radius:13px;background:#1e293b;padding:10px 20px;font-size:14px;font-weight:700;color:#fff;transition:.15s}
+  .nextbtn:hover{background:#0f172a}
+  .nextbtn svg{width:15px;height:15px}
+  .result{display:flex;flex-direction:column;flex:1;align-items:center;justify-content:center;gap:20px;padding:32px;text-align:center}
+  .result .badge{width:96px;height:96px;border-radius:99px;display:flex;align-items:center;justify-content:center}
+  .result .badge svg{width:44px;height:44px}
+  .result h2{font-size:30px;font-weight:800;color:var(--ink)}
+  .result .sc{margin-top:4px;color:var(--slate)}
+  .result .sc b{color:var(--rose)}
+  .result .rbar{height:12px;width:256px;border-radius:99px;background:#e2e8f0;overflow:hidden}
+  .result .rbar i{display:block;height:100%;border-radius:99px;transition:width .6s}
+  .result .note{max-width:400px;font-size:14px;line-height:1.5;color:var(--slate)}
+  .result .btns{display:flex;gap:12px}
+  .rbtn-p{display:flex;align-items:center;gap:8px;border-radius:13px;background:var(--rose);padding:10px 20px;font-weight:700;color:#fff;transition:.15s}
+  .rbtn-p:hover{background:var(--rose-dark)}
+  .rbtn-p svg{width:16px;height:16px}
+  .rbtn-s{border-radius:13px;border:1px solid #e2e8f0;background:#fff;padding:10px 20px;font-weight:700;color:var(--slate);transition:.15s}
+  .rbtn-s:hover{background:#f8fafc}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ LEFT ============ -->
+  <aside class="left">
+    <div class="card">
+      <div class="brand">
+        <div class="mk" id="brandHeart"></div>
+        <div>
+          <h1>HEMO</h1>
+          <p>Explore the Circulation</p>
+        </div>
+      </div>
+      <a class="backlink" href="../../index.html" id="backArrow">Back to Praxo Dashboard</a>
+    </div>
+
+    <div class="card journey">
+      <div class="hd"><b>The Journey</b><span>13 stops</span></div>
+      <div class="stops" id="stops"></div>
+    </div>
+
+    <div class="card lprog">
+      <div class="hd">
+        <b id="capIcon">Learning Progress</b>
+        <span id="learnCount">0/13</span>
+      </div>
+      <div class="meter"><i id="learnFill" style="width:0%"></i></div>
+    </div>
+  </aside>
+
+  <!-- ============ CENTER ============ -->
+  <main class="center">
+    <div class="main-card" id="mainCard">
+      <div id="learnView" style="display:flex;flex-direction:column;flex:1;min-height:0">
+        <div class="head">
+          <div class="ttl">
+            <h2 id="stepName"></h2>
+            <span class="oxy-pill" id="oxyPill"></span>
+          </div>
+          <p class="nick" id="stepNick"></p>
+          <p class="desc" id="stepDesc"></p>
+          <div class="chips" id="chips"></div>
+        </div>
+        <div id="viewer">
+          <button class="rot-btn on" id="rotBtn" title="Toggle auto-rotate"></button>
+          <button class="play-btn" id="playBtn"></button>
+          <div class="stage-pill">
+            <button id="prevBtn"></button>
+            <div class="mid">
+              <small id="stageNo">Flow Stage 1/13</small>
+              <b id="stageNext"></b>
+            </div>
+            <button id="nextBtn"></button>
+          </div>
+        </div>
+        <div class="dots" id="dots"></div>
+      </div>
+      <div id="quizView" style="display:none;flex-direction:column;flex:1"></div>
+    </div>
+
+    <div class="modes">
+      <div class="box">
+        <button class="mode on" data-mode="learn" id="modeLearn">Learn</button>
+        <button class="mode" data-mode="flow" id="modeFlow">Flow</button>
+        <button class="mode" data-mode="quiz" id="modeQuiz">Quiz</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ RIGHT ============ -->
+  <aside class="right">
+    <div class="card profile">
+      <div class="row">
+        <div class="pic" id="profPic"></div>
+        <div class="who">
+          <b>Anatomy Cadet</b>
+          <span id="profLevel">Level 1 · 0 XP</span>
+        </div>
+        <button class="bell" id="bellIcon"></button>
+      </div>
+      <div class="meter"><i id="profXpFill" style="width:0%"></i></div>
+      <div class="xph" id="profXpHint">0 / 100 XP to level 2</div>
+    </div>
+
+    <div id="sideLearn">
+      <div class="card ov" style="margin-bottom:16px">
+        <div class="hd"><b>Structure Overview</b><i id="ovDot"></i></div>
+        <div class="ovrows" id="ovRows"></div>
+      </div>
+      <div class="card fns">
+        <b>Functions &amp; Key Facts</b>
+        <div id="fnList"></div>
+      </div>
+    </div>
+
+    <div id="sideQuiz" style="display:none">
+      <div class="card legend">
+        <b>Colour Legend</b>
+        <div class="lg"><i style="background:#3b82f6"></i><span>Deoxygenated (O₂-poor)</span></div>
+        <div class="lg"><i style="background:#e11d48"></i><span>Oxygenated (O₂-rich)</span></div>
+        <div class="lg"><i style="background:#8b5cf6"></i><span>Gas exchange (lungs)</span></div>
+        <div class="tipbox">
+          <b id="tipSpark">Tip</b>
+          <p>Answer correctly to earn 12 XP and see the structure light up on the 3D heart.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast"><p id="tipText"></p></div>
+  </aside>
+</div>
+
+<script type="module">
+import * as THREE from '../../assets/vendor/three-bundle.min.js';
+const { OBJLoader, OrbitControls } = THREE;
+
+/* ============================================================
+   HEMO — static port of the blood-flow learning environment.
+   Same data, same 3D viewer, no framework: it runs anywhere
+   a landing page can be hosted.
+   ============================================================ */
+
+/* ---------------- icons (lucide) ---------------- */
+const IC = {
+  heart:'<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>',
+  droplet:'<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  waves:'<path d="M2 12q2.5 2 5 0t5 0 5 0 5 0"/><path d="M2 19q2.5 2 5 0t5 0 5 0 5 0"/><path d="M2 5q2.5 2 5 0t5 0 5 0 5 0"/>',
+  wind:'<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>',
+  door:'<path d="M11 20H2"/><path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"/><path d="M11 4H8a2 2 0 0 0-2 2v14"/><path d="M14 12h.01"/><path d="M22 20h-3"/>',
+  gauge:'<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+  layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>',
+  arrowR:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  arrowL:'<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+  play:'<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+  pause:'<rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/>',
+  rotate:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  gradcap:'<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  route:'<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  clipboard:'<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  chevR:'<path d="m9 18 6-6-6-6"/>',
+  sparkles:'<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>',
+  bell:'<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  circleDot:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/>',
+  activity:'<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+  x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  trophy:'<path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"/><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"/><path d="M18 9h1.5a1 1 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6 9H4.5a1 1 0 0 1 0-5H6"/>',
+};
+function icon(name, filled) {
+  return `<svg viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[name]}</svg>`;
+}
+const TYPE_ICON = { vessel: 'waves', chamber: 'heart', valve: 'door', organ: 'wind' };
+
+/* ---------------- data (identical to the original) ---------------- */
+const OXYGEN_META = {
+  deoxygenated: { label: 'Deoxygenated', color: '#3b82f6', soft: '#dbeafe' },
+  oxygenated: { label: 'Oxygenated', color: '#e11d48', soft: '#ffe4e6' },
+  exchange: { label: 'Gas Exchange', color: '#8b5cf6', soft: '#ede9fe' },
+};
+const TYPE_LABEL = { vessel: 'Blood Vessel', chamber: 'Heart Chamber', valve: 'Heart Valve', organ: 'Gas Exchange' };
+
+const FLOW = [
+  { id:'vena-cava', name:'Vena Cava', nickname:'The Return Gates', type:'vessel', oxygen:'deoxygenated', oxygenPct:70, pressure:'0–8 mmHg', wall:'Thin, distensible vein',
+    description:'Two great veins deliver oxygen-poor blood back to the heart. The superior vena cava drains the head, neck and arms; the inferior vena cava drains everything below the diaphragm. Both empty into the right atrium.',
+    functions:[{title:'Collect Used Blood',text:'Gather deoxygenated blood from the entire body.'},{title:'Low-Pressure Return',text:'Move blood back to the heart against very little pressure.'},{title:'Feed the Right Atrium',text:'Deposit blood into the first chamber of the flow.'}],
+    next:'Right Atrium', marker:[-0.34,1.58,0.12] },
+  { id:'right-atrium', name:'Right Atrium', nickname:'The Collecting Chamber', type:'chamber', oxygen:'deoxygenated', oxygenPct:70, pressure:'2–6 mmHg', wall:'Thin muscular wall',
+    description:'The upper-right chamber receives deoxygenated blood from the vena cavae. When it contracts it tops off the right ventricle below it, pushing blood through the tricuspid valve.',
+    functions:[{title:'Receive & Hold',text:'Buffer returning blood between heartbeats.'},{title:'Prime the Ventricle',text:'Contract to fill the right ventricle completely.'},{title:'Pacemaker Home',text:"Houses the SA node that sets the heart's rhythm."}],
+    next:'Tricuspid Valve', marker:[-0.4,1.16,0.16] },
+  { id:'tricuspid-valve', name:'Tricuspid Valve', nickname:'The Three-Door Gate', type:'valve', oxygen:'deoxygenated', oxygenPct:70, pressure:'One-way gate', wall:'Three fibrous cusps',
+    description:'A one-way valve with three flaps (cusps) sitting between the right atrium and right ventricle. It opens to let blood fall through, then snaps shut so blood cannot leak backward when the ventricle squeezes.',
+    functions:[{title:'Open Downward',text:'Let blood pass from atrium to ventricle.'},{title:'Prevent Backflow',text:'Seal shut during ventricular contraction.'},{title:'Anchored by Cords',text:'Chordae tendineae stop the cusps from flipping inside out.'}],
+    next:'Right Ventricle', marker:[-0.24,0.98,0.22] },
+  { id:'right-ventricle', name:'Right Ventricle', nickname:'The Lung Pump', type:'chamber', oxygen:'deoxygenated', oxygenPct:70, pressure:'25/4 mmHg', wall:'Moderate muscular wall',
+    description:"The lower-right chamber pumps deoxygenated blood the short distance to the lungs. Because that trip is close and low-resistance, its wall is thinner than the left ventricle's.",
+    functions:[{title:'Pump to the Lungs',text:'Drive blood into the pulmonary artery.'},{title:'Short-Haul Power',text:'Generate just enough pressure for the pulmonary circuit.'},{title:'Match the Left',text:'Eject the same volume as the left ventricle each beat.'}],
+    next:'Pulmonary Valve', marker:[-0.34,0.58,0.26] },
+  { id:'pulmonary-valve', name:'Pulmonary Valve', nickname:'The Lung Gateway', type:'valve', oxygen:'deoxygenated', oxygenPct:70, pressure:'One-way gate', wall:'Three semilunar cusps',
+    description:'A half-moon (semilunar) valve guarding the exit from the right ventricle into the pulmonary artery. It opens as the ventricle contracts and closes to stop blood sliding back in.',
+    functions:[{title:'Guard the Exit',text:'Open only when the right ventricle pushes.'},{title:'Prevent Reflux',text:'Close instantly as the ventricle relaxes.'},{title:'Semilunar Design',text:'Three pocket-like cusps balloon shut under back-pressure.'}],
+    next:'Pulmonary Artery', marker:[-0.08,1.36,0.2] },
+  { id:'pulmonary-artery', name:'Pulmonary Artery', nickname:'The Only Blue Artery', type:'vessel', oxygen:'deoxygenated', oxygenPct:70, pressure:'25/8 mmHg', wall:'Elastic arterial wall',
+    description:'The pulmonary trunk carries deoxygenated blood away from the heart, then splits into left and right branches to each lung. It is the only artery in the body that carries oxygen-poor blood.',
+    functions:[{title:'Route to Both Lungs',text:'Branch left and right toward each lung.'},{title:'Carry Blue Blood',text:'The lone artery moving deoxygenated blood.'},{title:'Deliver for Exchange',text:'Bring blood to the alveolar capillaries.'}],
+    next:'Lungs', marker:[0.04,1.72,0.14] },
+  { id:'lungs', name:'Lungs', nickname:'The Refuelling Station', type:'organ', oxygen:'exchange', oxygenPct:85, pressure:'Capillary bed', wall:'Alveolar membrane',
+    description:"In the lungs' tiny air sacs, blood drops off carbon dioxide and picks up oxygen. This is the moment blood turns from blue to red — the hand-off between the pulmonary and systemic loops.",
+    functions:[{title:'Release CO₂',text:'Offload waste carbon dioxide into exhaled air.'},{title:'Load Oxygen',text:'Bind fresh oxygen to haemoglobin.'},{title:'Blue → Red',text:'Convert deoxygenated blood into oxygenated blood.'}],
+    next:'Pulmonary Veins', marker:[0.62,1.5,0.05] },
+  { id:'pulmonary-veins', name:'Pulmonary Veins', nickname:'The Only Red Veins', type:'vessel', oxygen:'oxygenated', oxygenPct:98, pressure:'6–12 mmHg', wall:'Thin venous wall',
+    description:'Four pulmonary veins return freshly oxygenated blood from the lungs to the left atrium. They are the only veins in the body that carry oxygen-rich blood.',
+    functions:[{title:'Return Fresh Blood',text:'Bring oxygenated blood back from the lungs.'},{title:'Carry Red Blood',text:'The lone veins moving oxygenated blood.'},{title:'Fill the Left Atrium',text:'Deliver blood into the systemic side of the heart.'}],
+    next:'Left Atrium', marker:[0.42,1.26,-0.12] },
+  { id:'left-atrium', name:'Left Atrium', nickname:'The Fresh Reservoir', type:'chamber', oxygen:'oxygenated', oxygenPct:98, pressure:'4–12 mmHg', wall:'Thin muscular wall',
+    description:'The upper-left chamber receives oxygen-rich blood from the pulmonary veins and, on contraction, pushes it through the mitral valve to fill the powerful left ventricle.',
+    functions:[{title:'Receive Oxygen-Rich Blood',text:'Collect fresh blood returning from the lungs.'},{title:'Prime the Left Ventricle',text:"Top off the body's main pump."},{title:'Guard the Gateway',text:'Feed blood through the mitral valve.'}],
+    next:'Mitral Valve', marker:[0.42,1.16,-0.02] },
+  { id:'mitral-valve', name:'Mitral Valve', nickname:'The Two-Door Gate', type:'valve', oxygen:'oxygenated', oxygenPct:98, pressure:'One-way gate', wall:'Two fibrous cusps',
+    description:'Also called the bicuspid valve, this two-flap valve sits between the left atrium and left ventricle. It opens to let fresh blood fall in and seals against the enormous pressure of the left ventricle.',
+    functions:[{title:'Open Downward',text:'Let oxygenated blood into the left ventricle.'},{title:'Withstand High Pressure',text:'Hold firm against the strongest chamber.'},{title:'Two Cusps',text:'The only heart valve with just two leaflets.'}],
+    next:'Left Ventricle', marker:[0.2,0.92,0.16] },
+  { id:'left-ventricle', name:'Left Ventricle', nickname:'The Body Pump', type:'chamber', oxygen:'oxygenated', oxygenPct:98, pressure:'120/8 mmHg', wall:'Thickest muscular wall',
+    description:"The heart's powerhouse. This lower-left chamber has the thickest wall because it must push oxygenated blood through the entire body. It generates the highest pressure of any chamber.",
+    functions:[{title:'Pump to the Whole Body',text:'Drive blood into the aorta and systemic circuit.'},{title:'Highest Pressure',text:'Produce the force felt as your blood pressure.'},{title:'Thickest Muscle',text:"Its wall is roughly three times the right ventricle's."}],
+    next:'Aortic Valve', marker:[0.34,0.56,0.22] },
+  { id:'aortic-valve', name:'Aortic Valve', nickname:'The Body Gateway', type:'valve', oxygen:'oxygenated', oxygenPct:98, pressure:'One-way gate', wall:'Three semilunar cusps',
+    description:"A semilunar valve at the exit of the left ventricle into the aorta. It opens under the ventricle's huge push and closes to keep high-pressure blood from flooding back into the heart.",
+    functions:[{title:'Guard the Main Exit',text:'Open as the left ventricle contracts.'},{title:'Hold Back the Aorta',text:"Seal against the body's highest back-pressure."},{title:'Semilunar Cusps',text:'Three pockets snap shut to prevent reflux.'}],
+    next:'Aorta', marker:[0.06,1.2,0.1] },
+  { id:'aorta', name:'Aorta', nickname:'The Great Highway', type:'vessel', oxygen:'oxygenated', oxygenPct:98, pressure:'120/80 mmHg', wall:'Thick elastic wall',
+    description:'The largest artery in the body arches up and out of the left ventricle, then branches to carry oxygen-rich blood everywhere. From here the blood delivers oxygen, becomes deoxygenated, and the whole journey begins again.',
+    functions:[{title:'Distribute Everywhere',text:'Branch to supply every organ and tissue.'},{title:'Elastic Recoil',text:'Stretch and rebound to smooth out each pulse.'},{title:'Close the Loop',text:'Blood returns via the vena cava to start over.'}],
+    next:'Vena Cava (loop restarts)', marker:[0.16,1.76,-0.04] },
+];
+
+/* ---------------- state ---------------- */
+const XP_PER_STRUCTURE = 8, XP_PER_CORRECT = 12, XP_PER_LEVEL = 100;
+const S = {
+  index: 0, mode: 'learn', autoRotate: true, playing: false,
+  learned: new Set(), xp: 0, quizReveal: null, flowTimer: null,
+};
+try {
+  const raw = localStorage.getItem('hemo-progress');
+  if (raw) { const p = JSON.parse(raw); S.xp = p.xp ?? 0; S.learned = new Set(p.learned ?? []); }
+} catch { /* fresh start */ }
+function persist() {
+  try { localStorage.setItem('hemo-progress', JSON.stringify({ xp: S.xp, learned: [...S.learned] })); } catch { /* private mode */ }
+}
+
+/* ---------------- static icon slots ---------------- */
+document.getElementById('brandHeart').innerHTML = icon('heart', true);
+document.getElementById('backArrow').insertAdjacentHTML('afterbegin', icon('arrowL'));
+document.getElementById('capIcon').insertAdjacentHTML('afterbegin', icon('gradcap'));
+document.getElementById('profPic').innerHTML = icon('gradcap');
+document.getElementById('bellIcon').innerHTML = icon('bell');
+document.getElementById('rotBtn').innerHTML = icon('rotate');
+document.getElementById('prevBtn').innerHTML = icon('arrowL');
+document.getElementById('nextBtn').innerHTML = icon('arrowR');
+document.getElementById('tipSpark').insertAdjacentHTML('afterbegin', icon('sparkles'));
+document.getElementById('modeLearn').insertAdjacentHTML('afterbegin', icon('gradcap'));
+document.getElementById('modeFlow').insertAdjacentHTML('afterbegin', icon('route'));
+document.getElementById('modeQuiz').insertAdjacentHTML('afterbegin', icon('clipboard'));
+
+/* ---------------- render: left journey list ---------------- */
+const stopsEl = document.getElementById('stops');
+function renderStops() {
+  stopsEl.innerHTML = '';
+  FLOW.forEach((s, i) => {
+    const m = OXYGEN_META[s.oxygen];
+    const active = i === S.index && S.mode !== 'quiz';
+    const done = S.learned.has(s.id);
+    const b = document.createElement('button');
+    b.className = 'stop' + (active ? ' active' : '');
+    b.innerHTML = `
+      <div class="ico" style="background:${m.color}">${icon(TYPE_ICON[s.type])}<span class="num">${i + 1}</span></div>
+      <div class="tx"><b>${s.name}</b><span>${s.nickname}</span></div>
+      ${active ? '<span class="here">HERE</span>' : done ? `<span class="done">${icon('check')}</span>` : ''}`;
+    b.addEventListener('click', () => { goto(i); });
+    stopsEl.appendChild(b);
+  });
+  document.getElementById('learnCount').textContent = `${S.learned.size}/${FLOW.length}`;
+  document.getElementById('learnFill').style.width = `${(S.learned.size / FLOW.length) * 100}%`;
+}
+
+/* ---------------- render: center + right ---------------- */
+function renderStep() {
+  const s = FLOW[S.index];
+  const oxy = OXYGEN_META[s.oxygen];
+  document.getElementById('stepName').textContent = s.name;
+  const pill = document.getElementById('oxyPill');
+  pill.style.background = oxy.soft; pill.style.color = oxy.color;
+  pill.innerHTML = `${icon('droplet', true)}${oxy.label}`;
+  document.getElementById('stepNick').textContent = s.nickname;
+  document.getElementById('stepDesc').textContent = s.description;
+  document.getElementById('chips').innerHTML = `
+    <span class="chip">${icon('droplet')}${s.oxygenPct}% O₂</span>
+    <span class="chip">${icon('gauge')}${s.pressure}</span>
+    <span class="chip">${icon(TYPE_ICON[s.type])}${TYPE_LABEL[s.type]}</span>`;
+  document.getElementById('stageNo').textContent = `Flow Stage ${S.index + 1}/${FLOW.length}`;
+  document.getElementById('stageNext').textContent = 'Next: ' + s.next.replace(/ \(.*\)/, '');
+
+  // dots
+  const dots = document.getElementById('dots');
+  dots.innerHTML = '';
+  FLOW.forEach((f, i) => {
+    const d = document.createElement('button');
+    if (i === S.index) { d.className = 'on'; d.style.background = OXYGEN_META[f.oxygen].color; }
+    d.addEventListener('click', () => goto(i));
+    dots.appendChild(d);
+  });
+
+  // right overview
+  document.getElementById('ovDot').style.background = oxy.color;
+  const rows = [
+    { ic: 'droplet', label: 'Oxygenation', value: `${s.oxygenPct}%`, meter: s.oxygenPct, color: oxy.color },
+    { ic: 'activity', label: 'Blood State', value: oxy.label },
+    { ic: 'gauge', label: 'Pressure', value: s.pressure },
+    { ic: TYPE_ICON[s.type], label: 'Structure Type', value: TYPE_LABEL[s.type] },
+    { ic: 'layers', label: 'Wall / Build', value: s.wall },
+    { ic: 'route', label: 'Flow Stage', value: `${S.index + 1} of ${FLOW.length}`, meter: ((S.index + 1) / FLOW.length) * 100, color: '#e11d48' },
+  ];
+  document.getElementById('ovRows').innerHTML = rows.map((r) => `
+    <div class="ovrow">
+      <div class="ic">${icon(r.ic)}</div>
+      <div class="m"><small>${r.label}</small>${r.meter != null ? `<div class="mini"><i style="width:${r.meter}%;background:${r.color}"></i></div>` : ''}</div>
+      <b>${r.value}</b>
+    </div>`).join('');
+
+  document.getElementById('fnList').innerHTML = s.functions.map((f) => `
+    <div class="fn">
+      <div class="ic" style="background:${oxy.soft};color:${oxy.color}">${icon('circleDot')}</div>
+      <div class="m"><b>${f.title}</b><span>${f.text}</span></div>
+      ${icon('chevR')}
+    </div>`).join('');
+}
+
+function renderProfile() {
+  const level = Math.floor(S.xp / XP_PER_LEVEL) + 1;
+  const levelXp = S.xp % XP_PER_LEVEL;
+  document.getElementById('profLevel').textContent = `Level ${level} · ${S.xp} XP`;
+  document.getElementById('profXpFill').style.width = `${levelXp}%`;
+  document.getElementById('profXpHint').textContent = `${levelXp} / ${XP_PER_LEVEL} XP to level ${level + 1}`;
+}
+
+function renderTip() {
+  const msg = S.mode === 'quiz' ? 'Beat 75% to master this circuit.'
+    : S.mode === 'flow' ? 'Watch the blood travel the full double loop.'
+    : 'Click a numbered marker on the heart to jump there.';
+  document.getElementById('tipText').innerHTML = `${icon('sparkles')}${msg}`;
+}
+
+/* ---------------- learning / navigation ---------------- */
+function markLearned() {
+  if (S.mode === 'quiz') return;
+  const id = FLOW[S.index].id;
+  if (S.learned.has(id)) return;
+  S.learned.add(id);
+  S.xp += XP_PER_STRUCTURE;
+  persist();
+}
+function goto(i) {
+  S.index = i;
+  if (S.mode === 'quiz') switchMode('learn');
+  markLearned();
+  renderStops(); renderStep(); renderProfile();
+  viewerUpdate();
+}
+document.getElementById('prevBtn').addEventListener('click', () => goto((S.index - 1 + FLOW.length) % FLOW.length));
+document.getElementById('nextBtn').addEventListener('click', () => goto((S.index + 1) % FLOW.length));
+
+/* ---------------- modes ---------------- */
+const playBtn = document.getElementById('playBtn');
+function setPlaying(on) {
+  S.playing = on;
+  clearInterval(S.flowTimer);
+  if (on) S.flowTimer = setInterval(() => goto((S.index + 1) % FLOW.length), 2600);
+  playBtn.innerHTML = (on ? icon('pause', true) : icon('play', true)) + (on ? 'Pause flow' : 'Play flow');
+}
+function switchMode(m) {
+  S.mode = m;
+  S.quizReveal = null;
+  setPlaying(m === 'flow');
+  setAutoRotate(m === 'learn');
+  document.querySelectorAll('.mode').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+  document.getElementById('learnView').style.display = m === 'quiz' ? 'none' : 'flex';
+  document.getElementById('quizView').style.display = m === 'quiz' ? 'flex' : 'none';
+  document.getElementById('sideLearn').style.display = m === 'quiz' ? 'none' : 'block';
+  document.getElementById('sideQuiz').style.display = m === 'quiz' ? 'block' : 'none';
+  playBtn.style.display = m === 'flow' ? 'flex' : 'none';
+  if (m === 'quiz') startQuiz();
+  renderStops(); renderTip();
+  viewerUpdate();
+}
+document.querySelectorAll('.mode').forEach((b) => b.addEventListener('click', () => switchMode(b.dataset.mode)));
+playBtn.addEventListener('click', () => setPlaying(!S.playing));
+
+/* ---------------- quiz ---------------- */
+function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function distractors(exclude, pool, n) { return shuffle(pool.filter((p) => !exclude.includes(p))).slice(0, n); }
+function buildQuiz() {
+  const names = FLOW.map((s) => s.name);
+  const qs = [];
+  FLOW.forEach((s, i) => {
+    if (s.next.includes('loop')) return;
+    qs.push({ prompt: `Blood leaves the ${s.name}. Where does it flow next?`,
+      options: shuffle([s.next.replace(/ \(.*\)/, ''), ...distractors([s.name, s.next], names, 3)]),
+      answer: s.next.replace(/ \(.*\)/, ''), revealIndex: Math.min(i + 1, FLOW.length - 1) });
+  });
+  FLOW.forEach((s, i) => {
+    const short = s.description.split('. ')[0] + '.';
+    qs.push({ prompt: `Which structure is this? “${short}”`,
+      options: shuffle([s.name, ...distractors([s.name], names, 3)]), answer: s.name, revealIndex: i });
+  });
+  FLOW.filter((s) => s.oxygen !== 'exchange').forEach((s) => {
+    qs.push({ prompt: `Is the blood at the ${s.name} oxygenated or deoxygenated?`,
+      options: ['Oxygenated', 'Deoxygenated'],
+      answer: s.oxygen === 'oxygenated' ? 'Oxygenated' : 'Deoxygenated', revealIndex: FLOW.indexOf(s) });
+  });
+  [1, 4, 8, 10].forEach((pos) => {
+    const s = FLOW[pos];
+    qs.push({ prompt: `What is step ${pos + 1} in the journey of blood through the heart?`,
+      options: shuffle([s.name, ...distractors([s.name], names, 3)]), answer: s.name, revealIndex: pos });
+  });
+  return shuffle(qs).slice(0, 8);
+}
+
+const Q = { quiz: [], idx: 0, picked: null, score: 0 };
+function startQuiz() { Q.quiz = buildQuiz(); Q.idx = 0; Q.picked = null; Q.score = 0; renderQuiz(); }
+function renderQuiz() {
+  const view = document.getElementById('quizView');
+  const total = Q.quiz.length;
+
+  if (Q.idx >= total) { // results
+    const pct = Math.round((Q.score / total) * 100);
+    const great = pct >= 75;
+    view.innerHTML = `
+      <div class="result">
+        <div class="badge" style="background:${great ? '#ffe4e6' : '#fef3c7'};color:${great ? '#e11d48' : '#d97706'}">${icon('trophy')}</div>
+        <div>
+          <h2>${great ? 'Excellent work!' : 'Good effort!'}</h2>
+          <p class="sc">You scored <b>${Q.score}/${total}</b> (${pct}%)</p>
+        </div>
+        <div class="rbar"><i style="width:${pct}%;background:${great ? '#e11d48' : '#f59e0b'}"></i></div>
+        <p class="note">${great
+          ? 'You clearly know your way around the heart. Try Flow mode to lock in the sequence, or run the quiz again.'
+          : 'Review the flow in Learn mode, watch the animated Flow, then come back and beat your score.'}</p>
+        <div class="btns">
+          <button class="rbtn-p" id="qRetry">${icon('rotate')} Try again</button>
+          <button class="rbtn-s" id="qBack">Back to Learn</button>
+        </div>
+      </div>`;
+    document.getElementById('qRetry').addEventListener('click', startQuiz);
+    document.getElementById('qBack').addEventListener('click', () => switchMode('learn'));
+    return;
+  }
+
+  const q = Q.quiz[Q.idx];
+  const progress = Math.round((Q.idx / total) * 100);
+  view.innerHTML = `
+    <div class="quiz">
+      <div class="top">
+        <b>Knowledge Check</b>
+        <span>Question ${Q.idx + 1} / ${total} · Score ${Q.score}</span>
+      </div>
+      <div class="pbar"><i style="width:${progress}%"></i></div>
+      <h2>${q.prompt}</h2>
+      <div class="opts">${q.options.map((o) => `<button class="opt" data-opt="${o}"><span>${o}</span></button>`).join('')}</div>
+      <div class="foot">
+        <span id="qHint">Pick the best answer.</span>
+        <span id="qNextSlot"></span>
+      </div>
+    </div>`;
+
+  view.querySelectorAll('.opt').forEach((btn) => btn.addEventListener('click', () => {
+    if (Q.picked) return;
+    Q.picked = btn.dataset.opt;
+    S.quizReveal = q.revealIndex;
+    viewerUpdate();
+    const correct = Q.picked === q.answer;
+    if (correct) { Q.score++; S.xp += XP_PER_CORRECT; persist(); renderProfile(); }
+    view.querySelectorAll('.opt').forEach((b) => {
+      b.disabled = true;
+      const isAns = b.dataset.opt === q.answer;
+      const isPick = b.dataset.opt === Q.picked;
+      if (isAns) { b.classList.add('correct'); b.insertAdjacentHTML('beforeend', icon('check')); }
+      else if (isPick) { b.classList.add('wrong'); b.insertAdjacentHTML('beforeend', icon('x')); }
+      else b.classList.add('dim');
+    });
+    document.getElementById('qHint').textContent = correct
+      ? 'Correct — highlighted on the model.' : `Not quite — the answer is ${q.answer}.`;
+    document.getElementById('qNextSlot').innerHTML =
+      `<button class="nextbtn" id="qNext">${Q.idx + 1 >= total ? 'See results' : 'Next'} ${icon('arrowR')}</button>`;
+    document.getElementById('qNext').addEventListener('click', () => {
+      S.quizReveal = null; Q.idx++; Q.picked = null; viewerUpdate(); renderQuiz();
+    });
+  }));
+}
+
+/* ---------------- 3D viewer (ported 1:1) ---------------- */
+const CENTER = new THREE.Vector3(0.002, 0.946, 0);
+const mount = document.getElementById('viewer');
+
+function makeBadgeTexture(num, color, selected) {
+  const size = 128, c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d'), r = size / 2;
+  ctx.beginPath(); ctx.arc(r, r, r - 8, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+  ctx.beginPath(); ctx.arc(r, r, r - 14, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${selected ? 62 : 56}px sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(num), r, r + 3);
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+  return tex;
+}
+function makeLabelTexture(text, sub, color) {
+  const w = 512, h = 160, c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d'), pad = 20, radius = 26;
+  ctx.beginPath();
+  ctx.moveTo(pad + radius, pad);
+  ctx.arcTo(w - pad, pad, w - pad, h - pad, radius);
+  ctx.arcTo(w - pad, h - pad, pad, h - pad, radius);
+  ctx.arcTo(pad, h - pad, pad, pad, radius);
+  ctx.arcTo(pad, pad, w - pad, pad, radius);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.97)'; ctx.fill();
+  ctx.lineWidth = 6; ctx.strokeStyle = color; ctx.stroke();
+  ctx.fillStyle = '#0f172a'; ctx.font = 'bold 44px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, w / 2, h / 2 - 14);
+  ctx.fillStyle = color; ctx.font = '600 26px sans-serif';
+  ctx.fillText(sub.toUpperCase(), w / 2, h / 2 + 34);
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+  return tex;
+}
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+camera.position.set(0.2, 0.35, 3.5);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+mount.insertBefore(renderer.domElement, mount.firstChild);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(2, 3, 4); scene.add(key);
+const fill = new THREE.DirectionalLight(0xbcd4ff, 0.5); fill.position.set(-3, 1, -2); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffd5e0, 0.4); rim.position.set(0, -2, -3); scene.add(rim);
+
+const root = new THREE.Group(); scene.add(root);
+const content = new THREE.Group();
+content.position.copy(CENTER).multiplyScalar(-1);
+root.add(content);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.enablePan = false; controls.minDistance = 2.2; controls.maxDistance = 6;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.9;
+controls.target.set(0, 0, 0);
+
+const heartMat = new THREE.MeshStandardMaterial({
+  color: 0xc65a63, roughness: 0.62, metalness: 0.05, transparent: true, opacity: 0.92,
+});
+new OBJLoader().load('heart.obj', (obj) => {
+  obj.traverse((ch) => { if (ch.isMesh) { ch.geometry.computeVertexNormals(); ch.material = heartMat; } });
+  content.add(obj);
+}, undefined, (err) => console.error('heart model load error', err));
+
+const badges = [];
+FLOW.forEach((step, i) => {
+  const color = OXYGEN_META[step.oxygen].color;
+  const mat = new THREE.SpriteMaterial({ map: makeBadgeTexture(i + 1, color, false), depthTest: false, depthWrite: false, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.set(...step.marker);
+  sprite.scale.setScalar(0.14);
+  sprite.renderOrder = 10;
+  sprite.userData.index = i;
+  content.add(sprite);
+  badges.push(sprite);
+});
+
+const labelMat = new THREE.SpriteMaterial({ map: makeLabelTexture(FLOW[0].name, FLOW[0].nickname, OXYGEN_META[FLOW[0].oxygen].color), depthTest: false, depthWrite: false, transparent: true });
+const label = new THREE.Sprite(labelMat);
+label.scale.set(0.62, 0.19, 1); label.renderOrder = 20; label.visible = false;
+content.add(label);
+
+const ring = new THREE.Mesh(
+  new THREE.RingGeometry(0.09, 0.11, 40),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false })
+);
+ring.renderOrder = 9; ring.visible = false;
+content.add(ring);
+
+const curve = new THREE.CatmullRomCurve3(FLOW.map((s) => new THREE.Vector3(...s.marker)), false, 'catmullrom', 0.4);
+const pathLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(curve.getPoints(220)),
+  new THREE.LineBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0.45, depthTest: false })
+);
+pathLine.renderOrder = 5; pathLine.visible = false;
+content.add(pathLine);
+
+// raycast marker clicks
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let downXY = { x: 0, y: 0 };
+renderer.domElement.addEventListener('pointerdown', (e) => { downXY = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (Math.hypot(e.clientX - downXY.x, e.clientY - downXY.y) > 6) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(badges, false);
+  if (hits.length) goto(hits[0].object.userData.index);
+});
+
+function viewerUpdate() {
+  const revealed = S.quizReveal ?? S.index;
+  const showLabels = S.mode !== 'quiz' || S.quizReveal != null;
+
+  badges.forEach((b, i) => {
+    const step = FLOW[i];
+    const isSel = i === revealed && showLabels;
+    b.material.map?.dispose();
+    b.material.map = makeBadgeTexture(i + 1, OXYGEN_META[step.oxygen].color, isSel);
+    b.material.needsUpdate = true;
+    b.scale.setScalar(isSel ? 0.22 : 0.13);
+    b.material.opacity = S.mode === 'quiz' && S.quizReveal == null ? 0.9 : isSel ? 1 : 0.72;
+  });
+
+  const step = FLOW[revealed];
+  if (showLabels && step) {
+    const color = OXYGEN_META[step.oxygen].color;
+    labelMat.map?.dispose();
+    labelMat.map = makeLabelTexture(step.name, step.nickname, color);
+    labelMat.needsUpdate = true;
+    label.position.set(step.marker[0], step.marker[1] + 0.28, step.marker[2]);
+    label.visible = true;
+    ring.material.color.set(color);
+    ring.position.set(...step.marker);
+    ring.visible = true;
+  } else {
+    label.visible = false;
+    ring.visible = false;
+  }
+  pathLine.visible = S.mode === 'flow';
+}
+
+const rotBtn = document.getElementById('rotBtn');
+function setAutoRotate(on) {
+  S.autoRotate = on;
+  controls.autoRotate = on;
+  rotBtn.classList.toggle('on', on);
+}
+rotBtn.addEventListener('click', () => setAutoRotate(!S.autoRotate));
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const s = 1 + Math.sin(t * 3) * 0.18;
+  ring.scale.setScalar(s);
+  ring.material.opacity = 0.85 - (s - 1) * 1.5;
+  ring.quaternion.copy(camera.quaternion);
+  label.position.y += Math.sin(t * 2) * 0.00004;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function sizeViewer() {
+  const w = mount.clientWidth, h = mount.clientHeight;
+  if (!w || !h) return;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+addEventListener('resize', sizeViewer);
+new ResizeObserver(sizeViewer).observe(mount);
+
+/* ---------------- boot ---------------- */
+markLearned();
+renderStops(); renderStep(); renderProfile(); renderTip();
+setPlaying(false);
+playBtn.style.display = 'none';
+viewerUpdate();
+sizeViewer();
+animate();
+</script>
+</body>
+</html>

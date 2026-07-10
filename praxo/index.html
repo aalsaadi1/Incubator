@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Praxo — Your Campus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f0ebe1;
+    --card:rgba(253,251,246,.92);
+    --card-solid:#fdfbf6;
+    --card-border:#e7e0d4;
+    --ink:#2e2a33;
+    --ink-soft:#6f6878;
+    --ink-faint:#a49bab;
+    --teal:#0f9d8f;
+    --teal-deep:#0b7f74;
+    --math:#6b84d8;
+    --heart:#e11d48;
+    --amber:#e8a33d;
+    --shadow:0 10px 30px rgba(90,75,100,.10), 0 2px 6px rgba(90,75,100,.06);
+    --radius:22px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:'Archivo','Segoe UI',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    overflow:hidden;
+  }
+  #stage{position:fixed;inset:0;z-index:0;
+    background:
+      radial-gradient(ellipse 62% 58% at 50% 46%,#f8f2e8 0%,rgba(248,242,232,0) 70%),
+      linear-gradient(165deg,#f2ede3 0%,#f0ebe1 55%,#ece4e6 100%);
+  }
+  #stage canvas{display:block}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    backdrop-filter:blur(8px);
+  }
+
+  /* ---------- brand ---------- */
+  .brand{position:fixed;top:20px;left:20px;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 20px 14px 14px}
+  .brand .mark{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(140deg,var(--teal) 0%,var(--teal-deep) 100%);color:#fff;font-weight:900;font-size:22px;
+    box-shadow:inset 0 -6px 12px rgba(0,0,0,.15)}
+  .brand h1{font-size:20px;font-weight:900;letter-spacing:.22em}
+  .brand p{font-size:9.5px;font-weight:700;letter-spacing:.24em;color:var(--ink-faint);margin-top:2px}
+
+  /* ---------- student card ---------- */
+  .student{position:fixed;top:20px;right:20px;z-index:20;width:272px;padding:14px 16px}
+  .student .row{display:flex;align-items:center;gap:12px}
+  .student .pic{width:44px;height:44px;border-radius:16px;background:linear-gradient(140deg,#4a4453,#2e2a33);
+    color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px}
+  .student .who{flex:1;min-width:0}
+  .student .who b{display:block;font-size:14px;font-weight:800}
+  .student .who span{font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--ink-faint)}
+  .student .pts{text-align:right}
+  .student .pts b{display:block;font-size:16px;font-weight:900;color:var(--teal-deep)}
+  .student .pts span{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--ink-faint)}
+  .xpbar{margin-top:11px;height:7px;border-radius:99px;background:#e6dfd2;overflow:hidden}
+  .xpbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--amber),var(--teal));transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  .student .xphint{margin-top:5px;font-size:9.5px;font-weight:600;color:var(--ink-faint);text-align:right}
+
+  /* ---------- classes (left) ---------- */
+  .classes{position:fixed;left:20px;top:50%;transform:translateY(-50%);z-index:20;width:262px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .panel-title{display:flex;justify-content:space-between;align-items:baseline;padding:2px 6px}
+  .panel-title span{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--ink-faint)}
+  .class-card{display:flex;align-items:center;gap:12px;border:1.5px solid transparent;border-radius:18px;
+    padding:11px 12px;cursor:pointer;transition:all .2s;background:transparent;text-align:left;width:100%;font-family:inherit}
+  .class-card:hover{background:#fff;border-color:var(--card-border)}
+  .class-card.hot{background:#fff;box-shadow:var(--shadow)}
+  .class-card .dot{width:40px;height:40px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff}
+  .class-card .dot svg{width:19px;height:19px}
+  .class-card .meta{flex:1;min-width:0}
+  .class-card .meta b{display:block;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .class-card .meta span{display:block;font-size:10px;font-weight:600;color:var(--ink-faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .class-card .bar{margin-top:6px;height:4px;border-radius:99px;background:#eee7da;overflow:hidden}
+  .class-card .bar i{display:block;height:100%;border-radius:99px}
+  .class-card .pct{font-size:11px;font-weight:800;color:var(--ink-soft)}
+
+  /* ---------- up next (right) ---------- */
+  .next{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:20;width:272px;padding:14px;display:flex;flex-direction:column;gap:8px}
+  .quest{display:flex;align-items:center;gap:11px;padding:10px 8px;border-radius:16px;transition:background .2s}
+  .quest:hover{background:#fff}
+  .quest .qdot{width:34px;height:34px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center}
+  .quest .qdot svg{width:16px;height:16px}
+  .quest .qmeta{flex:1;min-width:0}
+  .quest .qmeta b{display:block;font-size:12.5px;font-weight:800}
+  .quest .qmeta span{display:block;font-size:10.5px;font-weight:600;color:var(--ink-faint);margin-top:1px;line-height:1.35}
+  .quest .soon{font-size:8.5px;font-weight:800;letter-spacing:.12em;color:#fff;background:var(--ink-faint);border-radius:7px;padding:3px 6px}
+
+  /* ---------- hint pill ---------- */
+  .hint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;
+    padding:10px 22px;border-radius:99px;font-size:12px;font-weight:700;color:var(--ink-soft);
+    display:flex;align-items:center;gap:9px}
+  .hint .k{color:var(--teal-deep)}
+  .hint em{font-style:normal;color:var(--ink-faint)}
+
+  /* ---------- floating nameplates ---------- */
+  .plate{position:fixed;z-index:10;transform:translate(-50%,0);text-align:center;pointer-events:auto;cursor:pointer;
+    transition:opacity .3s;user-select:none;-webkit-user-select:none}
+  .plate .chip{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.18em;color:#fff;border-radius:8px;padding:4px 9px;margin-bottom:7px}
+  .plate h3{font-size:17px;font-weight:900;letter-spacing:.02em;text-shadow:0 1px 0 rgba(255,255,255,.6)}
+  .plate p{font-size:11px;font-weight:700;color:var(--ink-soft);margin-top:2px}
+  .plate .enter{margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;
+    color:var(--ink-soft);background:var(--card);border:1px solid var(--card-border);border-radius:99px;padding:6px 13px;
+    box-shadow:var(--shadow);transition:all .2s;opacity:.85}
+  .plate.hot .enter{color:#fff;opacity:1}
+  .plate .enter svg{width:12px;height:12px}
+
+  /* ---------- fade overlay for entering a class ---------- */
+  #fader{position:fixed;inset:0;z-index:50;background:var(--bg);opacity:0;pointer-events:none;transition:opacity .45s ease}
+  #fader.on{opacity:1;pointer-events:auto}
+  #loading{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:var(--bg);transition:opacity .5s}
+  #loading.off{opacity:0;pointer-events:none}
+  #loading .l{display:flex;flex-direction:column;align-items:center;gap:14px;color:var(--ink-faint);font-size:11px;font-weight:800;letter-spacing:.25em}
+  #loading .mark{width:52px;height:52px;border-radius:18px;background:linear-gradient(140deg,var(--teal),var(--teal-deep));
+    color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:26px;animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+
+  @media (max-width:1020px){
+    .classes{width:214px}
+    .next{display:none}
+  }
+  @media (max-width:760px){
+    .classes{left:12px;bottom:70px;top:auto;transform:none;width:calc(100% - 24px);flex-direction:row;padding:10px}
+    .class-card{padding:8px}
+    .class-card .meta span{display:none}
+    .student{width:auto;right:12px;top:12px}
+    .student .xpbar,.student .xphint{display:none}
+    .brand{top:12px;left:12px}
+    .hint{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+
+<!-- brand -->
+<header class="brand card">
+  <div class="mark">P</div>
+  <div>
+    <h1>PRAXO</h1>
+    <p>BUILD REAL SKILLS</p>
+  </div>
+</header>
+
+<!-- student -->
+<section class="student card">
+  <div class="row">
+    <div class="pic">S</div>
+    <div class="who"><b>Student</b><span id="stuLevel">LEVEL 1</span></div>
+    <div class="pts"><b id="stuPts">0</b><span>PRAXO PTS</span></div>
+  </div>
+  <div class="xpbar"><i id="stuXpFill" style="width:0%"></i></div>
+  <div class="xphint" id="stuXpHint"></div>
+</section>
+
+<!-- classes -->
+<nav class="classes card">
+  <div class="panel-title"><span>MY CLASSES</span><span id="classCount"></span></div>
+  <div id="classList"></div>
+</nav>
+
+<!-- up next -->
+<aside class="next card">
+  <div class="panel-title"><span>UP NEXT</span><span></span></div>
+  <div id="questList"></div>
+</aside>
+
+<!-- hint -->
+<div class="hint card"><span><em>Drag</em>&nbsp;<span class="k">a professor</span> to look around</span>·<span><em>Click</em> to <span class="k">enter their class</span></span></div>
+
+<!-- nameplates injected here -->
+
+<div id="loading"><div class="l"><div class="mark">P</div><span>OPENING CAMPUS</span></div></div>
+<div id="fader"></div>
+
+<script type="module">
+import * as THREE from './assets/vendor/three-bundle.min.js';
+const { GLTFLoader } = THREE;
+
+/* ============================================================
+   Praxo student dashboard
+   Two professors float mid-stage; drag to spin them, click to
+   walk into their class. Panels read live progress saved by
+   each course (localStorage), so this page is the one home
+   for "where am I and what's next".
+   ============================================================ */
+
+const ICONS = {
+  triangle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 4a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+  flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>',
+  rocket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+};
+
+/* ---------------- class registry ---------------- */
+const CLASSES = [
+  {
+    id: 'math',
+    title: 'Math Explorer',
+    course: 'GEOMETRY',
+    topic: 'The Pythagorean Theorem',
+    prof: 'Prof. Elias Stone',
+    href: 'courses/math/index.html',
+    accent: '#6b84d8',
+    model: 'assets/models/professor-math.glb',
+    icon: ICONS.triangle,
+    seat: -1, // left
+  },
+  {
+    id: 'heart',
+    title: 'HEMO — The Human Heart',
+    course: 'BIOLOGY',
+    topic: 'The Journey of Blood',
+    prof: 'Prof. Amara Bell',
+    href: 'courses/heart/index.html',
+    accent: '#e11d48',
+    model: 'assets/models/professor-heart.glb',
+    icon: ICONS.heart,
+    seat: 1, // right
+  },
+];
+
+/* ---------------- progress (read what each course saved) ---------------- */
+const MATH_TOPICS = 6;
+const HEART_STOPS = 13;
+
+function readJSON(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || null; } catch { return null; }
+}
+
+function getProgress() {
+  const math = readJSON('mathExplorerProgress');
+  const heart = readJSON('hemo-progress');
+
+  const mathDone = math ? Object.values(math.done || {}).filter(Boolean).length : 0;
+  const mathPts = math ? Math.max(0, (math.level - 1) * 100 + (math.xp || 0)) : 0;
+
+  const heartLearned = heart ? (heart.learned || []).length : 0;
+  const heartPts = heart ? (heart.xp || 0) : 0;
+
+  return {
+    math: {
+      pct: mathDone / MATH_TOPICS,
+      sub: math ? `${mathDone}/${MATH_TOPICS} lessons · Lv ${math.level}` : 'New — start today',
+      next: mathDone >= MATH_TOPICS
+        ? { t: 'Chase a new quiz streak', s: `Best so far: ${math?.streakBest ?? 0} in a row` }
+        : { t: `Finish ${MATH_TOPICS - mathDone} more lesson${MATH_TOPICS - mathDone === 1 ? '' : 's'}`, s: 'with Prof. Stone in Math Explorer' },
+      pts: mathPts,
+      started: !!math,
+    },
+    heart: {
+      pct: heartLearned / HEART_STOPS,
+      sub: heart ? `${heartLearned}/${HEART_STOPS} stops · ${heartPts} XP` : 'New — start today',
+      next: heartLearned >= HEART_STOPS
+        ? { t: 'Ace the circulation quiz', s: 'Score 75%+ to master the circuit' }
+        : { t: `Visit ${HEART_STOPS - heartLearned} more stops`, s: 'on the blood journey with Prof. Bell' },
+      pts: heartPts,
+      started: !!heart,
+    },
+  };
+}
+
+/* ---------------- panels ---------------- */
+const classList = document.getElementById('classList');
+const questList = document.getElementById('questList');
+document.getElementById('classCount').textContent = CLASSES.length;
+
+function hexSoft(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+function renderPanels() {
+  const p = getProgress();
+  let totalPts = 0;
+
+  classList.innerHTML = '';
+  CLASSES.forEach((c) => {
+    const prog = p[c.id];
+    totalPts += prog.pts;
+    const el = document.createElement('button');
+    el.className = 'class-card';
+    el.dataset.id = c.id;
+    el.innerHTML = `
+      <div class="dot" style="background:${c.accent}">${c.icon}</div>
+      <div class="meta">
+        <b>${c.title}</b>
+        <span>${prog.sub}</span>
+        <div class="bar"><i style="width:${Math.round(prog.pct * 100)}%;background:${c.accent}"></i></div>
+      </div>
+      <span class="pct">${Math.round(prog.pct * 100)}%</span>`;
+    el.addEventListener('click', () => enterClass(c));
+    el.addEventListener('mouseenter', () => setHover(c.id, true));
+    el.addEventListener('mouseleave', () => setHover(c.id, false));
+    classList.appendChild(el);
+  });
+
+  questList.innerHTML = '';
+  CLASSES.forEach((c) => {
+    const q = p[c.id].next;
+    const el = document.createElement('div');
+    el.className = 'quest';
+    el.innerHTML = `
+      <div class="qdot" style="background:${hexSoft(c.accent, .12)};color:${c.accent}">${ICONS.flag}</div>
+      <div class="qmeta"><b>${q.t}</b><span>${q.s}</span></div>`;
+    questList.appendChild(el);
+  });
+  const launch = document.createElement('div');
+  launch.className = 'quest';
+  launch.innerHTML = `
+    <div class="qdot" style="background:${hexSoft('#0f9d8f', .12)};color:#0b7f74">${ICONS.rocket}</div>
+    <div class="qmeta"><b>Pick your first launch</b><span>Turn a skill into something real</span></div>
+    <span class="soon">SOON</span>`;
+  questList.appendChild(launch);
+
+  const level = Math.floor(totalPts / 100) + 1;
+  document.getElementById('stuPts').textContent = totalPts.toLocaleString();
+  document.getElementById('stuLevel').textContent = `LEVEL ${level}`;
+  document.getElementById('stuXpFill').style.width = `${totalPts % 100}%`;
+  document.getElementById('stuXpHint').textContent = `${totalPts % 100} / 100 to level ${level + 1}`;
+}
+renderPanels();
+window.addEventListener('focus', renderPanels); // refresh when returning from a class
+window.addEventListener('pageshow', renderPanels);
+
+/* ---------------- nameplates ---------------- */
+const plates = {};
+CLASSES.forEach((c) => {
+  const el = document.createElement('div');
+  el.className = 'plate';
+  el.innerHTML = `
+    <span class="chip" style="background:${c.accent}">${c.course}</span>
+    <h3>${c.prof}</h3>
+    <p>${c.title}</p>
+    <span class="enter">ENTER CLASS ${ICONS.arrow}</span>`;
+  el.addEventListener('click', () => enterClass(c));
+  el.addEventListener('mouseenter', () => setHover(c.id, true));
+  el.addEventListener('mouseleave', () => setHover(c.id, false));
+  document.body.appendChild(el);
+  plates[c.id] = el;
+});
+
+/* ---------------- 3D stage ---------------- */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 0.1, 60);
+const CAM_BASE = new THREE.Vector3(0, 1.05, 5.4);
+camera.position.copy(CAM_BASE);
+const LOOK_AT = new THREE.Vector3(0, 0.78, 0);
+camera.lookAt(LOOK_AT);
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.15));
+const key = new THREE.DirectionalLight(0xfff4e0, 2.0); key.position.set(2.5, 4, 4); scene.add(key);
+const fill = new THREE.DirectionalLight(0xbfd0ff, 0.9); fill.position.set(-3.5, 2, -1); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 0.7); rim.position.set(0, 3, -4); scene.add(rim);
+
+// soft shadow blob texture
+function makeBlobTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(128, 128, 10, 128, 128, 120);
+  grad.addColorStop(0, 'rgba(90,75,100,0.30)');
+  grad.addColorStop(1, 'rgba(90,75,100,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);
+}
+const blobTex = makeBlobTexture();
+
+/* each professor: a pivot group we can bob + spin */
+const SEAT_X = 1.06;
+const AVATAR_H = 1.5;
+const profs = {}; // id -> { pivot, inner, spin, spinV, hover, baseYaw, phase, lastTouch, meshes:[], plateAnchor }
+
+const loader = new GLTFLoader();
+let loadedCount = 0;
+
+CLASSES.forEach((c, ci) => {
+  const pivot = new THREE.Group();
+  pivot.position.set(c.seat * SEAT_X, 0, 0);
+  scene.add(pivot);
+
+  // shadow blob
+  const blob = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.6, 1.6),
+    new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false })
+  );
+  blob.rotation.x = -Math.PI / 2;
+  blob.position.y = 0.005;
+  pivot.add(blob);
+
+  // accent ring platform
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.72, 0.735, 72),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(c.accent), transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.01;
+  pivot.add(ring);
+
+  const inner = new THREE.Group(); // spins & bobs
+  pivot.add(inner);
+
+  const P = {
+    pivot, inner, ring,
+    spin: 0, spinV: 0,
+    hover: false, dragging: false,
+    baseYaw: -c.seat * 0.16, // face slightly inward
+    phase: ci * 1.7,
+    lastTouch: -10,
+    meshes: [],
+    cls: c,
+    scaleT: 1,
+  };
+  profs[c.id] = P;
+
+  loader.load(c.model, (gltf) => {
+    const obj = gltf.scene;
+    // normalize: feet on ground, uniform height
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const s = AVATAR_H / size.y;
+    obj.scale.setScalar(s);
+    box.setFromObject(obj);
+    const ctr = box.getCenter(new THREE.Vector3());
+    obj.position.x -= ctr.x;
+    obj.position.z -= ctr.z;
+    obj.position.y -= box.min.y;
+
+    obj.traverse((ch) => {
+      if (ch.isMesh) {
+        ch.material.metalness = Math.min(ch.material.metalness ?? 0, 0.12);
+        ch.material.roughness = Math.max(ch.material.roughness ?? 1, 0.55);
+        P.meshes.push(ch);
+      }
+    });
+    inner.add(obj);
+    loadedCount++;
+    if (loadedCount === CLASSES.length) {
+      document.getElementById('loading').classList.add('off');
+    }
+  });
+});
+
+/* ---------------- interaction ---------------- */
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2();
+let mouseNX = 0, mouseNY = 0;
+let drag = null; // { P, x0, y0, t0, moved }
+let clockT = 0;
+
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  ray.setFromCamera(ptr, camera);
+  for (const id of Object.keys(profs)) {
+    if (profs[id].meshes.length && ray.intersectObjects(profs[id].meshes, false).length) return profs[id];
+  }
+  return null;
+}
+
+function setHover(id, on) {
+  const P = profs[id];
+  if (!P) return;
+  P.hover = on;
+  plates[id].classList.toggle('hot', on);
+  const enter = plates[id].querySelector('.enter');
+  enter.style.background = on ? P.cls.accent : '';
+  enter.style.borderColor = on ? P.cls.accent : '';
+  document.querySelector(`.class-card[data-id="${id}"]`)?.classList.toggle('hot', on);
+}
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  mouseNX = (e.clientX / innerWidth) * 2 - 1;
+  mouseNY = (e.clientY / innerHeight) * 2 - 1;
+  if (drag) {
+    const dx = e.clientX - drag.xPrev;
+    const dy = e.clientY - drag.yPrev;
+    drag.xPrev = e.clientX; drag.yPrev = e.clientY;
+    drag.P.spin += dx * 0.012;
+    drag.P.spinV = dx * 0.012;
+    drag.P.tilt = THREE.MathUtils.clamp((drag.P.tilt || 0) + dy * 0.004, -0.22, 0.22);
+    drag.P.lastTouch = clockT;
+    if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 7) drag.moved = true;
+  } else {
+    const hit = pick(e);
+    for (const id of Object.keys(profs)) {
+      if (profs[id].hover !== (hit === profs[id])) setHover(id, hit === profs[id]);
+    }
+    renderer.domElement.style.cursor = hit ? 'grab' : 'default';
+  }
+});
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  const hit = pick(e);
+  if (!hit) return;
+  drag = { P: hit, x0: e.clientX, y0: e.clientY, xPrev: e.clientX, yPrev: e.clientY, t0: performance.now(), moved: false };
+  hit.dragging = true;
+  hit.lastTouch = clockT;
+  renderer.domElement.style.cursor = 'grabbing';
+  renderer.domElement.setPointerCapture(e.pointerId);
+});
+
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!drag) return;
+  const { P, moved, t0 } = drag;
+  P.dragging = false;
+  drag = null;
+  renderer.domElement.style.cursor = 'grab';
+  if (!moved && performance.now() - t0 < 500) enterClass(P.cls);
+});
+
+window.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });
+
+/* ---------------- enter a class ---------------- */
+let entering = false;
+function enterClass(c) {
+  if (entering) return;
+  entering = true;
+  const P = profs[c.id];
+  document.getElementById('fader').classList.add('on');
+  // gentle dolly toward the chosen professor
+  const from = camera.position.clone();
+  const to = new THREE.Vector3(c.seat * SEAT_X * 0.55, 1.0, 3.1);
+  const start = performance.now();
+  (function fly() {
+    const k = Math.min(1, (performance.now() - start) / 460);
+    const ease = 1 - Math.pow(1 - k, 3);
+    camera.position.lerpVectors(from, to, ease);
+    camera.lookAt(P ? P.pivot.position.clone().setY(0.85) : LOOK_AT);
+    if (k < 1) requestAnimationFrame(fly);
+  })();
+  setTimeout(() => { location.href = c.href; }, 480);
+}
+
+/* ---------------- animate ---------------- */
+const clock = new THREE.Clock();
+const v3 = new THREE.Vector3();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  clockT = clock.elapsedTime;
+
+  for (const id of Object.keys(profs)) {
+    const P = profs[id];
+    const t = clockT + P.phase;
+
+    // Rodin-style float: gentle bob + sway
+    P.inner.position.y = 0.045 + Math.sin(t * 1.15) * 0.028;
+    const idleSway = Math.sin(t * 0.55) * 0.075;
+    const idleTilt = Math.sin(t * 0.8 + 1.2) * 0.02;
+
+    // spring the user's spin back home after a few idle seconds
+    if (!P.dragging) {
+      P.spin += P.spinV; P.spinV *= 0.92; // inertia
+      if (clockT - P.lastTouch > 2.5) {
+        P.spin *= 1 - Math.min(1, dt * 1.6);
+        P.tilt = (P.tilt || 0) * (1 - Math.min(1, dt * 1.6));
+      }
+    }
+
+    P.inner.rotation.y = P.baseYaw + idleSway + P.spin;
+    P.inner.rotation.x = idleTilt + (P.tilt || 0);
+
+    // hover: scale + ring glow
+    const targetS = P.hover || P.dragging ? 1.045 : 1;
+    P.scaleT += (targetS - P.scaleT) * Math.min(1, dt * 8);
+    P.inner.scale.setScalar(P.scaleT);
+    P.ring.material.opacity += (((P.hover || P.dragging) ? 0.85 : 0.35) - P.ring.material.opacity) * Math.min(1, dt * 6);
+    P.ring.scale.setScalar(1 + Math.sin(clockT * 2.2) * 0.012);
+
+    // project nameplate under the professor
+    v3.set(P.pivot.position.x, -0.06, P.pivot.position.z + 0.75).project(camera);
+    const px = (v3.x * 0.5 + 0.5) * innerWidth;
+    const py = (-v3.y * 0.5 + 0.5) * innerHeight;
+    plates[id].style.left = px + 'px';
+    plates[id].style.top = py + 'px';
+  }
+
+  // parallax camera drift (paused while flying into a class)
+  if (!entering) {
+    camera.position.x = CAM_BASE.x + mouseNX * 0.16;
+    camera.position.y = CAM_BASE.y - mouseNY * 0.08;
+    camera.lookAt(LOOK_AT);
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
