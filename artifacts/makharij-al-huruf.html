@@ -4702,6 +4702,12 @@ function init3D(){
   controls.enableDamping=true;controls.dampingFactor=.09;
   controls.minDistance=1.4;controls.maxDistance=6;controls.enablePan=false;
   controls.rotateSpeed=.85;
+  /* keep the view on the sectioned face so letter badges always sit on
+     the same visible anatomy — no drifting over the back of the head */
+  controls.minAzimuthAngle=Math.PI/2-0.85;
+  controls.maxAzimuthAngle=Math.PI/2+0.85;
+  controls.minPolarAngle=Math.PI/2-0.55;
+  controls.maxPolarAngle=Math.PI/2+0.32;
   scene.add(new THREE.AmbientLight(0xffffff,1.15));
   const k=new THREE.DirectionalLight(0xffffff,1.55);k.position.set(-3,4,3);scene.add(k);
   const f=new THREE.DirectionalLight(0xfff0e0,.5);f.position.set(3,1,-2);scene.add(f);
@@ -4772,7 +4778,9 @@ function buildHotspots(){
     el.style.setProperty('--rc',`var(${rOf(m.r).color})`);
     el.innerHTML=`<div class="lets">${m.letters.join(' ')}</div><div class="dot"></div><div class="lbl">${L(m)}</div>`;
     el.addEventListener('click',(e)=>{e.stopPropagation();onHotspot(m);});
-    layer.appendChild(el);hotEls[m.i]=el;m._pos=new THREE.Vector3(0.02,m.y,m.z);
+    /* anchor on the visible cut-face surface (x≈0.27) — being on the surface,
+       the badge stays locked to its anatomical spot from every allowed angle */
+    layer.appendChild(el);hotEls[m.i]=el;m._pos=new THREE.Vector3(0.295,m.y,m.z);
   });
 }
 const _v=new THREE.Vector3();
