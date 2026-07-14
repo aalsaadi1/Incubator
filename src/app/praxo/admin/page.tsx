@@ -152,9 +152,37 @@ function CoursesTab() {
     setMessage(null)
   }
 
+  const loadStarter = async () => {
+    setMessage('⏳ Loading the starter course (indexing the knowledge base takes ~15 seconds)…')
+    try {
+      const res = await api<{ course: string; chunks: number }>('/api/praxo/admin/seed', {
+        method: 'POST',
+      })
+      setMessage(`✅ "${res.course}" is live with ${res.chunks} knowledge entries.`)
+      await load()
+    } catch (e) {
+      setMessage(`⚠️ ${e instanceof Error ? e.message : 'Seed failed'}`)
+    }
+  }
+
   if (!selected) {
     return (
       <div className="space-y-3">
+        {message && <p className="rounded-lg bg-slate-900 px-4 py-2 text-sm">{message}</p>}
+        {courses.length === 0 && (
+          <div className="rounded-2xl border border-indigo-500/40 bg-slate-900 p-6 text-center">
+            <p className="font-semibold text-white">No courses yet.</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Load the starter course — “Run Your First Ad Campaign” — to get Praxo live in one click.
+            </p>
+            <button
+              onClick={() => void loadStarter()}
+              className="mt-4 rounded-lg bg-indigo-500 px-5 py-2 font-semibold text-white hover:bg-indigo-400"
+            >
+              Load starter course
+            </button>
+          </div>
+        )}
         {courses.map((c) => (
           <button
             key={c.id}

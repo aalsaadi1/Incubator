@@ -49,19 +49,18 @@ Keep a private note open while you work. You'll collect these values:
      site address (e.g. `https://incubator-xyz.vercel.app`) and redeploy.
 4. Click **Deploy** and wait ~2 minutes for the confetti.
 
-## Step 4 — Load the ads course (one-time, ~10 minutes)
+## Step 4 — Load the ads course (one click)
 
-The database starts empty. Easiest path — ask Claude (me) to do it: I can run
-the two setup commands against your database if you add the `DATABASE_URL`
-and `OPENAI_API_KEY` to a `.env` file in a session. Or, if you have a
-technical friend for 10 minutes, they run:
+The database tables are created automatically during every deploy. To load
+the starter course:
 
-```bash
-git clone <your repo> && cd Incubator && npm install
-# put DATABASE_URL and OPENAI_API_KEY in a file named .env
-npm run db:push       # creates the tables
-npm run praxo:seed    # loads "Run Your First Ad Campaign"
-```
+1. Open `https://<your-site>.vercel.app/praxo/admin`
+2. Sign in with your `PRAXO_ADMIN_PASSWORD`
+3. Click **Load starter course** and wait ~15 seconds
+
+That's it — "Run Your First Ad Campaign" is now live with its knowledge base
+indexed. (The same button also refreshes the starter course later if you
+ever want to reset it.)
 
 ## Step 5 — Take your own course
 
