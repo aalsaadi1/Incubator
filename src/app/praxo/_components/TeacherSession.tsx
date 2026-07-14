@@ -148,10 +148,15 @@ export default function TeacherSession({ plan, onStepPassed }: Props) {
     setError(null)
     setStatus('connecting')
     try {
-      const token = await praxoFetch<{ clientSecret: string; model: string; sessionId: string }>(
-        '/api/praxo/realtime/token',
-        { method: 'POST', body: JSON.stringify({ planId: plan.id }) }
-      )
+      const token = await praxoFetch<{
+        clientSecret: string
+        model: string
+        sessionId: string
+        sessionUpdateEvent?: string
+      }>('/api/praxo/realtime/token', {
+        method: 'POST',
+        body: JSON.stringify({ planId: plan.id }),
+      })
       sessionIdRef.current = token.sessionId
 
       const session = new PraxoRealtimeSession({
@@ -170,7 +175,7 @@ export default function TeacherSession({ plan, onStepPassed }: Props) {
         },
       })
       sessionRef.current = session
-      await session.connect(token.clientSecret, token.model)
+      await session.connect(token.clientSecret, token.model, token.sessionUpdateEvent)
     } catch (e) {
       setStatus('ended')
       setError(e instanceof Error ? e.message : 'Could not start the session.')

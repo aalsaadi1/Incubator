@@ -112,6 +112,17 @@ export async function POST(req: NextRequest) {
       steps: plan.steps,
     })
 
+    // The teacher's session configuration. Baked into the ephemeral secret
+    // AND returned to the client as a ready-to-send session.update event —
+    // some transport paths start the session without applying the secret's
+    // config, so clients push it explicitly right after connecting.
+    const sessionConfig = {
+      type: 'realtime',
+      instructions,
+      tools: TEACHER_TOOLS,
+      audio: { output: { voice: process.env.PRAXO_TEACHER_VOICE || 'marin' } },
+    }
+
     const res = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST',
       headers: {
@@ -120,11 +131,8 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         session: {
-          type: 'realtime',
+          ...sessionConfig,
           model: process.env.PRAXO_REALTIME_MODEL || 'gpt-realtime',
-          instructions,
-          tools: TEACHER_TOOLS,
-          audio: { output: { voice: process.env.PRAXO_TEACHER_VOICE || 'marin' } },
         },
       }),
     })
@@ -145,6 +153,9 @@ export async function POST(req: NextRequest) {
       sessionId: session.id,
       model: process.env.PRAXO_REALTIME_MODEL || 'gpt-realtime',
       currentStep: plan.steps.find((s) => s.status === 'CURRENT') ?? null,
+      // Clients send this string verbatim over the socket/data channel as
+      // soon as the connection opens (see docs/praxo/API.md).
+      sessionUpdateEvent: JSON.stringify({ type: 'session.update', session: sessionConfig }),
     })
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -55,11 +55,19 @@ voice teacher (instructions + tools baked in server-side), and opens a
 `PraxoSession` row.
 
 Body: `{ "planId": "..." }`
-→ `200 { clientSecret, expiresAt, sessionId, currentStep }`
+→ `200 { clientSecret, expiresAt, sessionId, model, currentStep, sessionUpdateEvent }`
 
 The client connects to OpenAI Realtime (`wss://api.openai.com/v1/realtime`,
-or WebRTC) with `Authorization: Bearer <clientSecret>`. The session is
-pre-configured with these function tools the client must handle:
+or WebRTC) with `Authorization: Bearer <clientSecret>`.
+
+**REQUIRED**: immediately after the connection opens (WebSocket connected /
+data channel open), the client must send `sessionUpdateEvent` — a
+pre-serialized `session.update` JSON string — verbatim down the wire. This
+re-asserts the teacher's instructions and tools; some transport paths start
+the session without applying the secret's baked-in config, which manifests
+as a teacher that doesn't know the course and never calls tools.
+
+The session's function tools the client must handle:
 
 | Tool | Executed | Contract |
 |---|---|---|
