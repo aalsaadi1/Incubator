@@ -112,9 +112,25 @@ Latency/robustness follow-ups (only after the loop works):
 
 ## Phase 4 — Ship
 
-1. Developer ID signing + notarization; adapt `scripts/release.sh` and the
+1. **48-hour check-in nudge**: when the "checkin" step becomes CURRENT
+   (i.e. the learner just launched their campaign), schedule a local macOS
+   notification (`UNUserNotificationCenter`) for +48h: "Your campaign has
+   two days of data — review it with your teacher." Clicking it opens the
+   plan window. Cancel it if the step passes early. (Server-side email is a
+   later backend milestone; local notification is the v1.)
+2. **Course-complete state**: when a plan's status is COMPLETED,
+   `PraxoPlanView` shows a celebration banner ("🎉 Course complete — you
+   shipped the real thing") instead of the session button, matching the web
+   app's behavior.
+3. **Pre-configure the production server**: bake the deployed backend URL
+   and device token into the build as defaults (registered UserDefaults),
+   so real users skip the Connect screen entirely. The settings sheet
+   remains available to override for dev.
+4. **Remove or repoint PostHog analytics** (`ClickyAnalytics.swift`) —
+   clicky's usage telemetry must not phone home from Praxo builds.
+5. Developer ID signing + notarization; adapt `scripts/release.sh` and the
    Sparkle `appcast.xml` for Praxo's name and your update URL.
-2. Build the DMG; test on a second Mac (or fresh user account) with clean
+6. Build the DMG; test on a second Mac (or fresh user account) with clean
    permissions.
 
 ## Rules
