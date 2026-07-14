@@ -42,6 +42,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 
+    if (!interview.transcript) {
+      return NextResponse.json(
+        { error: 'Interview has no transcript to analyze' },
+        { status: 400 }
+      )
+    }
+
     // Analyze the interview
     const analysis = await analyzeInterview(
       {

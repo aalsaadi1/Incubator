@@ -1,5 +1,9 @@
 # Replit Agent Brief: Praxo
 
+> **SUPERSEDED (2026-07):** the web app described here was built directly in
+> this repo — see `src/app/praxo/` and `docs/praxo/DEPLOY.md`. Kept for
+> reference only.
+
 > Copy everything below this line into Replit Agent.
 
 ---

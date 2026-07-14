@@ -91,6 +91,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 })
     }
 
+    // Cost guardrail: cap voice sessions per learner per day.
+    const maxPerDay = Number(process.env.PRAXO_MAX_SESSIONS_PER_DAY || 10)
+    const dayStart = new Date()
+    dayStart.setHours(0, 0, 0, 0)
+    const sessionsToday = await prisma.praxoSession.count({
+      where: { plan: { userKey: caller.userKey }, startedAt: { gte: dayStart } },
+    })
+    if (sessionsToday >= maxPerDay) {
+      return NextResponse.json(
+        { error: 'Daily session limit reached. Come back tomorrow — your plan will be waiting.' },
+        { status: 429 }
+      )
+    }
+
     const template = plan.course.planTemplate as unknown as PlanTemplate
     const instructions = buildTeacherInstructions({
       persona: template.teacherPersona,
@@ -129,6 +143,7 @@ export async function POST(req: NextRequest) {
       clientSecret: secret.value ?? secret.client_secret?.value,
       expiresAt: secret.expires_at ?? secret.client_secret?.expires_at,
       sessionId: session.id,
+      model: process.env.PRAXO_REALTIME_MODEL || 'gpt-realtime',
       currentStep: plan.steps.find((s) => s.status === 'CURRENT') ?? null,
     })
   } catch (error) {
