@@ -26,7 +26,7 @@ export class PraxoRealtimeSession {
 
   constructor(private callbacks: RealtimeCallbacks) {}
 
-  async connect(clientSecret: string, model: string): Promise<void> {
+  async connect(clientSecret: string, model: string, sessionUpdateEvent?: string): Promise<void> {
     this.callbacks.onStatus('connecting')
 
     const pc = new RTCPeerConnection()
@@ -55,7 +55,12 @@ export class PraxoRealtimeSession {
         // non-JSON frames are ignored
       }
     }
-    dc.onopen = () => this.callbacks.onStatus('live')
+    dc.onopen = () => {
+      // Re-assert the teacher's config: some transport paths start the
+      // session without applying the ephemeral secret's baked-in config.
+      if (sessionUpdateEvent) dc.send(sessionUpdateEvent)
+      this.callbacks.onStatus('live')
+    }
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
