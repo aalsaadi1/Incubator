@@ -3,6 +3,20 @@
 <!-- This is the single source of truth for all AI coding agents. CLAUDE.md is a symlink to this file. -->
 <!-- AGENTS.md spec: https://github.com/agentsmd/agents.md — supported by Claude Code, Cursor, Copilot, Gemini CLI, and others. -->
 
+> ## ⚠️ This codebase is now Praxo
+>
+> This directory is a vendored copy of clicky (MIT) being turned into
+> **Praxo**, an AI teaching app: course cards → survey → personalized gated
+> plan → screen-aware voice teacher. **Start with `MAC_BUILD_PLAN.md`**
+> (phased build plan + rules) and `PRAXO.md` (wiring guide); the backend
+> contract is `../docs/praxo/API.md`. The new code lives in
+> `leanring-buddy/Praxo/` and uses the OpenAI Realtime API — the
+> AssemblyAI/Claude/ElevenLabs pipeline described below is legacy, unused by
+> Praxo sessions, and slated for removal in Phase 3. Everything below still
+> applies to the vendored shell (menu bar panel, overlay, screen capture,
+> permissions, conventions, and the do-NOTs — especially: build with Cmd+R
+> in Xcode, never `xcodebuild` from the terminal).
+
 ## Overview
 
 macOS menu bar companion app. Lives entirely in the macOS status bar (no dock icon, no main window). Clicking the menu bar icon opens a custom floating panel with companion voice controls. Uses push-to-talk (ctrl+option) to capture voice input, transcribes it via AssemblyAI streaming, and sends the transcript + a screenshot of the user's screen to Claude. Claude responds with text (streamed via SSE) and voice (ElevenLabs TTS). A blue cursor overlay can fly to and point at UI elements Claude references on any connected monitor.

@@ -44,7 +44,7 @@ placeholder; ignore it unless you want the legacy pipeline.
    Screen Recording when prompted (clicky's existing onboarding handles the
    prompts).
 
-For the phased build order and acceptance tests, see `CURSOR_PLAN.md`.
+For the phased build order and acceptance tests, see `MAC_BUILD_PLAN.md`.
 
 ## Backend setup (repo root)
 

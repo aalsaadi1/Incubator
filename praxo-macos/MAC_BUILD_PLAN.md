@@ -1,7 +1,7 @@
-# Cursor Build Plan: Praxo macOS App
+# Praxo macOS App — Build Plan (for Claude Code or any coding agent)
 
 > Working brief for building the native Praxo client in this directory with
-> Cursor + Xcode. Read `PRAXO.md` (wiring details) and `../docs/praxo/API.md`
+> Xcode. Read `PRAXO.md` (wiring details) and `../docs/praxo/API.md`
 > (backend contract) alongside this.
 
 ## Context in 30 seconds
@@ -101,6 +101,13 @@ Latency/robustness follow-ups (only after the loop works):
 
 ## Rules
 
+0. **Build in Xcode (Cmd+R), never `xcodebuild` from the terminal** — per the
+   upstream `CLAUDE.md`, terminal builds invalidate TCC permissions (screen
+   recording, accessibility) and force re-granting. The human presses Cmd+R
+   and shares errors; the agent edits code. Also from upstream: do NOT rename
+   the `leanring-buddy` directory/scheme (the typo is intentional legacy —
+   Phase 3 renames only display name, bundle id, and icon), and do not fix
+   the known non-blocking Swift 6 concurrency warnings.
 1. **Never bypass gates**: step completion only via
    `POST /api/praxo/steps/:id` with `action: complete` + evidence.
 2. **The backend contract is frozen** (`../docs/praxo/API.md`). Don't edit
