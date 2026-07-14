@@ -89,8 +89,26 @@ Latency/robustness follow-ups (only after the loop works):
    ElevenLabs providers, `workerBaseURL` paths in `CompanionManager`) —
    keep the screen-capture and cursor-overlay code, which Praxo uses.
    Prefer deleting dead UI over deleting shared utilities.
-3. Strip unused assets (onboarding video/screenshots, `ff.mp3`) **and**
-   their `project.pbxproj` resource references together.
+3. **Replace clicky's onboarding with Praxo's.** Keep clicky's permission-
+   request *machinery* (the TCC prompt flows in `WindowPositionManager` /
+   `CompanionManager`), but replace its content, branding, and video with a
+   4-screen Praxo first-run flow:
+   1. **Welcome** — "Praxo teaches by doing": one screen, one sentence on
+      courses → survey → a teacher on your real screen, one Continue button.
+   2. **Connect** — the existing `PraxoSettingsView` (server + device
+      token), skipped automatically if already configured and reachable.
+   3. **Permissions** — Microphone and Screen Recording, each with a
+      plain-language line on *why the teacher needs it*, requested via the
+      existing clicky flows (screen-recording grant requires app restart —
+      keep clicky's handling of that).
+   4. **Consent** — plain-language privacy notice: during sessions your
+      voice and screen are sent to OpenAI and the Praxo server to power the
+      teacher; nothing is captured outside sessions. Must be affirmatively
+      accepted once (persist in UserDefaults) before the first session.
+   Completing the flow lands in the course library. Re-runnable from
+   settings.
+4. Strip unused assets (clicky onboarding video/screenshots, `ff.mp3`)
+   **and** their `project.pbxproj` resource references together.
 
 ## Phase 4 — Ship
 
