@@ -50,6 +50,7 @@ final class PraxoLibraryModel: ObservableObject {
 
 struct PraxoCourseLibraryView: View {
     @StateObject private var model = PraxoLibraryModel()
+    @State private var showSettings = false
 
     private let columns = [GridItem(.adaptive(minimum: 220), spacing: 16)]
 
@@ -68,14 +69,33 @@ struct PraxoCourseLibraryView: View {
             }
         }
         .frame(minWidth: 720, minHeight: 480)
-        .task { await model.load() }
+        .task {
+            // First run: prompt for server settings before anything can load.
+            if PraxoConfig.deviceToken.isEmpty {
+                showSettings = true
+            }
+            await model.load()
+        }
+        .sheet(isPresented: $showSettings, onDismiss: { Task { await model.load() } }) {
+            PraxoSettingsView()
+        }
     }
 
     private var library: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("What do you want to get done?")
-                    .font(.largeTitle.bold())
+                HStack {
+                    Text("What do you want to get done?")
+                        .font(.largeTitle.bold())
+                    Spacer()
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
                 Text("Pick a course. Your teacher builds the plan around you, then coaches you through it on your real screen.")
                     .foregroundStyle(.secondary)
 

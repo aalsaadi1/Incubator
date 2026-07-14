@@ -125,4 +125,8 @@ final class PraxoAPIClient {
         )
         return try decoder.decode(PraxoRealtimeToken.self, from: data)
     }
+
+    func endSession(sessionId: String) async throws {
+        _ = try await request("/api/praxo/sessions/\(sessionId)/end", method: "POST", body: [:])
+    }
 }

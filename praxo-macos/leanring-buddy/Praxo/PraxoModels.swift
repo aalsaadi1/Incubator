@@ -70,6 +70,7 @@ struct PraxoRealtimeToken: Codable {
     let clientSecret: String
     let expiresAt: Int?
     let sessionId: String
+    let model: String?
     let currentStep: PraxoStep?
 }
 

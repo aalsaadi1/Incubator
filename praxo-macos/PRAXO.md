@@ -17,6 +17,7 @@ teacher. See `docs/praxo/PLAN.md` at the repo root for the full plan.
 | `Praxo/PraxoCourseLibraryView.swift` | Course cards grid |
 | `Praxo/PraxoSurveyView.swift` | Survey → plan generation flow |
 | `Praxo/PraxoPlanView.swift` | Step plan with gates + session start/stop |
+| `Praxo/PraxoSettingsView.swift` | First-run/settings sheet: server URL + device token |
 | `Praxo/PraxoWindowManager.swift` | Opens the library window from the menu-bar app |
 
 The clicky voice chain (AssemblyAI → Claude → ElevenLabs via Cloudflare
@@ -38,13 +39,12 @@ placeholder; ignore it unless you want the legacy pipeline.
    the cursor overlay), observe it and reuse the same code path as the
    `[POINT:x,y:label]` tag handling, converting normalized → pixel coordinates
    for the cursor's screen.
-5. Configure the app (Terminal, once):
-   ```bash
-   defaults write <your-bundle-id> PraxoBackendURL "http://localhost:3000"
-   defaults write <your-bundle-id> PraxoDeviceToken "<same value as backend PRAXO_DEVICE_TOKEN>"
-   ```
-6. Run. Grant Microphone + Screen Recording when prompted (clicky's existing
-   onboarding handles the prompts).
+5. Run. On first launch the settings sheet (`PraxoSettingsView`) asks for the
+   server URL and device token — no Terminal needed. Grant Microphone +
+   Screen Recording when prompted (clicky's existing onboarding handles the
+   prompts).
+
+For the phased build order and acceptance tests, see `CURSOR_PLAN.md`.
 
 ## Backend setup (repo root)
 

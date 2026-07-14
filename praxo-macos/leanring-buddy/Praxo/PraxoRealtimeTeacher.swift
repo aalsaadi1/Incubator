@@ -33,6 +33,7 @@ final class PraxoRealtimeTeacher: NSObject, ObservableObject {
 
     private let plan: PraxoPlan
     private var socket: URLSessionWebSocketTask?
+    private var sessionId: String?
     private let audioEngine = AVAudioEngine()
     private var playerNode = AVAudioPlayerNode()
 
@@ -47,12 +48,13 @@ final class PraxoRealtimeTeacher: NSObject, ObservableObject {
     // MARK: - Session lifecycle
 
     func start() async {
-        guard state == .idle || state != .live else { return }
+        guard state != .live, state != .connecting else { return }
         state = .connecting
         do {
             let token = try await PraxoAPIClient.shared.mintRealtimeToken(planId: plan.id)
+            sessionId = token.sessionId
             if let step = token.currentStep { currentStep = step }
-            try connectSocket(clientSecret: token.clientSecret)
+            try connectSocket(clientSecret: token.clientSecret, model: token.model ?? "gpt-realtime")
             try startMicrophone()
             state = .live
         } catch {
@@ -65,11 +67,17 @@ final class PraxoRealtimeTeacher: NSObject, ObservableObject {
         audioEngine.stop()
         socket?.cancel(with: .normalClosure, reason: nil)
         socket = nil
+        if let sessionId {
+            self.sessionId = nil
+            Task { try? await PraxoAPIClient.shared.endSession(sessionId: sessionId) }
+        }
         if case .ended = state {} else { state = .ended(nil) }
     }
 
-    private func connectSocket(clientSecret: String) throws {
-        var request = URLRequest(url: URL(string: "wss://api.openai.com/v1/realtime")!)
+    private func connectSocket(clientSecret: String, model: String) throws {
+        var components = URLComponents(string: "wss://api.openai.com/v1/realtime")!
+        components.queryItems = [URLQueryItem(name: "model", value: model)]
+        var request = URLRequest(url: components.url!)
         request.setValue("Bearer \(clientSecret)", forHTTPHeaderField: "Authorization")
 
         let task = URLSession.shared.webSocketTask(with: request)
