@@ -318,6 +318,109 @@ model Conflict {
   @@map("conflicts")
 }
 
+// ============================================================
+// Praxo — course teaching app (see docs/praxo/PLAN.md)
+// ============================================================
+
+enum PraxoCourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PraxoPlanStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum PraxoStepStatus {
+  LOCKED
+  CURRENT
+  PASSED
+}
+
+model PraxoCourse {
+  id           String            @id @default(cuid())
+  slug         String            @unique
+  title        String
+  description  String
+  coverEmoji   String?
+  status       PraxoCourseStatus @default(DRAFT)
+  survey       Json // question definitions the app renders
+  planTemplate Json // canonical step skeleton the generator personalizes
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  chunks PraxoKbChunk[]
+  plans  PraxoCoursePlan[]
+
+  @@map("praxo_courses")
+}
+
+model PraxoKbChunk {
+  id        String   @id @default(cuid())
+  courseId  String   @map("course_id")
+  title     String
+  content   String // markdown, ~300-800 tokens
+  embedding Json? // float[] from text-embedding-3-small; cosine search in-process
+  stepTags  String[] // which template steps this chunk supports
+  createdAt DateTime @default(now())
+
+  course PraxoCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("praxo_kb_chunks")
+}
+
+model PraxoCoursePlan {
+  id            String          @id @default(cuid())
+  userKey       String          @map("user_key") // device/user identifier until full auth lands (M4)
+  courseId      String          @map("course_id")
+  surveyAnswers Json
+  status        PraxoPlanStatus @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  completedAt   DateTime?
+
+  course   PraxoCourse    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  steps    PraxoStep[]
+  sessions PraxoSession[]
+
+  @@index([userKey, status])
+  @@map("praxo_course_plans")
+}
+
+model PraxoStep {
+  id           String          @id @default(cuid())
+  planId       String          @map("plan_id")
+  order        Int
+  title        String
+  goal         String // what "done" looks like, in plain language
+  instructions String // personalized how-to
+  gate         String // verification criterion the agent checks before passing
+  status       PraxoStepStatus @default(LOCKED)
+  evidence     String? // agent's justification when the gate passed
+  stuckFlags   Json? // [{reason, at}] — where learners stall
+  passedAt     DateTime?
+
+  plan PraxoCoursePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, order])
+  @@map("praxo_steps")
+}
+
+model PraxoSession {
+  id           String    @id @default(cuid())
+  planId       String    @map("plan_id")
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  stepsTouched String[]
+  costCents    Int? // tracked from Realtime usage events
+
+  plan PraxoCoursePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("praxo_sessions")
+}
+
 model InvestorPitch {
   id              String   @id @default(cuid())
   companyId       String   @map("company_id")
